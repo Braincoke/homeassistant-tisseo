@@ -12,7 +12,7 @@ README en anglais : [README_en.md](README_en.md)
 - **Départs en temps réel** - Affiche les prochains départs avec indicateur temps réel vs théorique.
 - **Alertes de service** - Surveille les alertes actives Tisseo pour votre ligne, avec détection des nouvelles alertes pour les automatisations de notification.
 - **Couleurs officielles des lignes** - Lit `bgXmlColor` et `fgXmlColor` depuis l'API Tisseo pour afficher chaque ligne avec ses couleurs officielles dans les cartes compagnon.
-- **Bouton d'actualisation manuelle** - Chaque appareil d'arrêt inclut un bouton pour déclencher un rafraîchissement à la demande.
+- **Bouton d'actualisation manuelle** - Chaque ligne inclut un bouton pour déclencher un rafraîchissement à la demande.
 - **Action départs planifiés** - Appelez un service intégré pour récupérer les départs sur une fenêtre future (par exemple demain matin), avec stockage optionnel du résultat sur un capteur dédié par arrêt.
 - **Mode debug** - Option pour journaliser tous les appels API et réponses (anonymisés) avec le préfixe `[TISSEO]`.
 - **Traductions françaises et anglaises** - Traductions UI complètes dans les deux langues.
@@ -52,7 +52,7 @@ Chaque entrée d'arrêt représente **un arrêt** sur **une ligne** dans **une d
 
 ## Entités
 
-Chaque arrêt configuré crée un appareil avec les entités suivantes :
+Chaque arrêt configuré crée un device avec les entités suivantes :
 
 ### Capteurs
 
