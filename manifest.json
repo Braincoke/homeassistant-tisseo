@@ -3,9 +3,9 @@
   "name": "Tisseo",
   "codeowners": [],
   "config_flow": true,
-  "documentation": "https://github.com/your-org/tisseo-homeassistant",
+  "documentation": "https://github.com/braincoke/homeassistant-tisseo",
   "iot_class": "cloud_polling",
-  "issue_tracker": "https://github.com/your-org/tisseo-homeassistant/issues",
+  "issue_tracker": "https://github.com/braincoke/homeassistant-tisseo/issues",
   "requirements": ["aiohttp>=3.8.0"],
   "version": "0.5.20"
 }
