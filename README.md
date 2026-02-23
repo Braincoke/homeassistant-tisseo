@@ -3,6 +3,8 @@
 Intégration Home Assistant personnalisée pour [Tisseo](https://www.tisseo.fr/), le réseau de transport public de Toulouse. Surveillez les prochains départs en temps réel, les alertes de service et les informations de transport pour n'importe quel arrêt du réseau (Métro, Tram, Bus et Linéo).
 
 README en anglais : [README_en.md](README_en.md)
+<img width="1119" height="708" alt="image" src="https://github.com/user-attachments/assets/e5f62f18-7756-4865-9e11-52f182ace388" />
+
 
 ## Fonctionnalités
 
@@ -38,6 +40,8 @@ https://data.toulouse-metropole.fr/ (ou via le portail Tisseo Open Data).
 
 ## Configuration
 
+<img width="457" height="637" alt="image" src="https://github.com/user-attachments/assets/ecbeb576-73f1-498f-ad4c-db2026c657ca" />
+
 L'intégration se configure entièrement via l'interface en deux phases :
 
 1. Ajoutez **Tisseo** une première fois pour créer l'entrée globale **Tisseo API Usage** :
@@ -53,6 +57,9 @@ Chaque entrée d'arrêt représente **un arrêt** sur **une ligne** dans **une d
 ## Entités
 
 Chaque arrêt configuré crée un device avec les entités suivantes :
+
+<img width="1067" height="822" alt="image" src="https://github.com/user-attachments/assets/ab8bc630-3b1c-4c7a-af6f-cd2d8a008d1e" />
+
 
 ### Capteurs
 
