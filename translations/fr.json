@@ -1,0 +1,194 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration Tisseo",
+        "description": "Configurez les paramètres globaux Tisseo.\n\nVous pouvez utiliser le **mode simulation** pour tester sans clé API, ou entrer votre clé API Tisseo pour les données réelles.\n\nPour obtenir une clé API, envoyez un email à opendata@tisseo.fr",
+        "data": {
+          "api_key": "Clé API (optionnel en mode simulation)",
+          "use_mock_data": "Utiliser les données de simulation (pour les tests)",
+          "update_strategy": "Mode de mise à jour",
+          "static_interval": "Intervalle régulier (secondes)",
+          "messages_refresh_interval": "Intervalle de rafraîchissement des messages (secondes, 0 = désactivé)",
+          "outages_refresh_interval": "Intervalle de rafraîchissement des pannes (secondes, 0 = désactivé)",
+          "debug": "Mode debug (journalise les appels et réponses API)"
+        }
+      },
+      "transport_mode": {
+        "title": "Choisir le mode de transport",
+        "description": "Sélectionnez le type de transport que vous souhaitez surveiller.",
+        "data": {
+          "transport_mode": "Mode de transport"
+        }
+      },
+      "line": {
+        "title": "Choisir la ligne",
+        "description": "Sélectionnez la ligne que vous souhaitez surveiller.",
+        "data": {
+          "line": "Ligne"
+        }
+      },
+      "route": {
+        "title": "Choisir la direction",
+        "description": "Sélectionnez le sens de circulation.",
+        "data": {
+          "route": "Direction"
+        }
+      },
+      "stop": {
+        "title": "Choisir l'arrêt",
+        "description": "Sélectionnez l'arrêt que vous souhaitez surveiller.",
+        "data": {
+          "stop_id": "Arrêt"
+        }
+      },
+      "options": {
+        "title": "Options",
+        "description": "Configurez les paramètres d'alerte pour cet arrêt.",
+        "data": {
+          "imminent_threshold": "Alerte départ imminent (minutes)",
+          "messages_refresh_interval": "Intervalle de rafraîchissement des messages (secondes, 0 = désactivé)",
+          "outages_refresh_interval": "Intervalle de rafraîchissement des pannes (secondes, 0 = désactivé)",
+          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
+          "active_windows": "Créneaux horaires"
+        }
+      },
+      "schedule": {
+        "title": "Créneaux horaires",
+        "description": "Configurez tous les créneaux de mise à jour intelligente au même endroit.\n\nCréneaux actuels : {windows}",
+        "data": {
+          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
+          "active_windows": "Créneaux horaires"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Ré-authentification Tisseo",
+        "description": "Votre clé API Tisseo n'est plus valide. Veuillez entrer une nouvelle clé API.\n\nPour obtenir une clé API, envoyez un email à opendata@tisseo.fr",
+        "data": {
+          "api_key": "Nouvelle clé API"
+        }
+      }
+    },
+    "error": {
+      "api_key_required": "La clé API est requise si vous n'utilisez pas le mode simulation",
+      "invalid_auth": "Clé API invalide",
+      "cannot_connect": "Impossible de se connecter à l'API Tisseo",
+      "mode_required": "Veuillez sélectionner un mode de transport",
+      "line_required": "Veuillez sélectionner une ligne",
+      "route_required": "Veuillez sélectionner une direction",
+      "stop_required": "Veuillez sélectionner un arrêt",
+      "stop_already_configured": "Cet arrêt est déjà configuré",
+      "invalid_time_range": "L'heure de début doit être avant l'heure de fin",
+      "no_windows_configured": "Au moins un créneau horaire est requis",
+      "window_definition_invalid": "Configuration de créneau horaire invalide",
+      "no_windows_to_remove": "Il n'y a aucun créneau à supprimer",
+      "window_days_required": "Veuillez sélectionner au moins un jour"
+    },
+    "abort": {
+      "already_configured": "Cet arrêt est déjà configuré",
+      "no_transport_modes": "Aucun mode de transport disponible",
+      "no_lines": "Aucune ligne disponible pour ce mode de transport",
+      "no_routes": "Aucun itinéraire disponible pour cette ligne",
+      "no_stops": "Aucun arrêt disponible pour cet itinéraire",
+      "reauth_successful": "Ré-authentification réussie"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options Tisseo",
+        "description": "Configurez les paramètres d'alerte pour cet arrêt.",
+        "data": {
+          "imminent_threshold": "Alerte départ imminent (minutes)",
+          "api_key": "Nouvelle clé API (laisser vide pour conserver l'actuelle)",
+          "messages_refresh_interval": "Intervalle de rafraîchissement des messages (secondes, 0 = désactivé)",
+          "outages_refresh_interval": "Intervalle de rafraîchissement des pannes (secondes, 0 = désactivé)",
+          "debug": "Mode debug (journalise les appels et réponses API)",
+          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
+          "active_windows": "Créneaux horaires"
+        }
+      },
+      "menu": {
+        "title": "Options Tisseo",
+        "description": "Mode de mise à jour actuel : {current_strategy}",
+        "menu_options": {
+          "edit_settings": "Modifier les réglages",
+          "update_strategy": "Changer le mode de mise à jour"
+        }
+      },
+      "edit_settings": {
+        "title": "Paramètres globaux",
+        "description": "Configurez les paramètres globaux de mise à jour.\n\nMode de mise à jour actuel : {current_strategy}\n\nCréneaux actuels : {windows}",
+        "data": {
+          "static_interval": "Intervalle régulier (secondes)",
+          "api_key": "Nouvelle clé API (laisser vide pour conserver l'actuelle)",
+          "messages_refresh_interval": "Intervalle de rafraîchissement des messages (secondes, 0 = désactivé)",
+          "outages_refresh_interval": "Intervalle de rafraîchissement des pannes (secondes, 0 = désactivé)",
+          "debug": "Mode debug (journalise les appels et réponses API)",
+          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
+          "active_windows": "Créneaux horaires"
+        }
+      },
+      "update_strategy": {
+        "title": "Mode de mise à jour",
+        "description": "Mode de mise à jour actuel : {current_strategy}\n\nSélectionnez un nouveau mode de mise à jour.",
+        "data": {
+          "update_strategy": "Mode de mise à jour"
+        }
+      },
+      "schedule": {
+        "title": "Créneaux horaires",
+        "description": "Configurez tous les créneaux de mise à jour intelligente au même endroit.\n\nCréneaux actuels : {windows}",
+        "data": {
+          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
+          "active_windows": "Créneaux horaires"
+        }
+      }
+    }
+  },
+  "issues": {
+    "api_failure": {
+      "title": "API Tisseo inaccessible pour {stop_name}",
+      "description": "L'API Tisseo est inaccessible depuis {failures} tentatives consécutives. La dernière erreur était :\n\n`{error}`\n\nLes données de départs peuvent être obsolètes. L'intégration se rétablira automatiquement lorsque l'API sera de nouveau disponible."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_departure": {
+        "name": "Prochain départ"
+      },
+      "minutes_until": {
+        "name": "Minutes avant le départ"
+      },
+      "next_line": {
+        "name": "Ligne"
+      },
+      "next_destination": {
+        "name": "Destination"
+      },
+      "departures": {
+        "name": "Départs"
+      },
+      "api_calls_total": {
+        "name": "Total appels API"
+      },
+      "api_calls_successful": {
+        "name": "Appels API réussis"
+      },
+      "api_calls_failed": {
+        "name": "Appels API en échec"
+      },
+      "api_calls_today": {
+        "name": "Appels API aujourd'hui"
+      }
+    },
+    "binary_sensor": {
+      "imminent": {
+        "name": "Départ imminent"
+      },
+      "alerts": {
+        "name": "Alertes de service"
+      }
+    }
+  }
+}

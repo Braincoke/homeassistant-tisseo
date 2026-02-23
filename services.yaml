@@ -1,0 +1,90 @@
+get_nearby_stops:
+  name: Get nearby stops
+  description: Find Tisseo transit stops near a given GPS location. Returns stop names, distances, and the lines serving each stop.
+  fields:
+    latitude:
+      name: Latitude
+      description: GPS latitude of the location to search near
+      required: true
+      example: 43.6047
+      selector:
+        number:
+          min: -90
+          max: 90
+          mode: box
+    longitude:
+      name: Longitude
+      description: GPS longitude of the location to search near
+      required: true
+      example: 1.4442
+      selector:
+        number:
+          min: -180
+          max: 180
+          mode: box
+    max_distance:
+      name: Max distance
+      description: Maximum search radius in meters (100-2000)
+      default: 500
+      selector:
+        number:
+          min: 100
+          max: 2000
+          step: 50
+          unit_of_measurement: m
+    max_results:
+      name: Max results
+      description: Maximum number of stops to return (1-20)
+      default: 10
+      selector:
+        number:
+          min: 1
+          max: 20
+
+get_planned_departures:
+  name: Get planned departures
+  description: Fetch departures for a future datetime window for one configured Tisseo stop and optionally store the result on the stop's Planned departures sensor.
+  fields:
+    stop_entity_id:
+      name: Stop entity
+      description: Any sensor entity from the target Tisseo stop entry
+      required: true
+      selector:
+        entity:
+          integration: tisseo
+          domain: sensor
+    start_datetime:
+      name: Start datetime
+      description: Start of the requested window (e.g. 2026-02-24 07:40)
+      required: true
+      example: "2026-02-24 07:40"
+      selector:
+        text:
+    end_datetime:
+      name: End datetime
+      description: End of the requested window (e.g. 2026-02-24 08:15)
+      required: true
+      example: "2026-02-24 08:15"
+      selector:
+        text:
+    number:
+      name: Number of departures to request
+      description: Maximum departures requested from API before client-side window filtering
+      default: 40
+      selector:
+        number:
+          min: 1
+          max: 200
+          step: 1
+    display_realtime:
+      name: Use real-time data
+      description: Use real-time values when available. Disable for day-ahead theoretical planning.
+      default: false
+      selector:
+        boolean:
+    store_result:
+      name: Store result on sensor
+      description: Update the stop Planned departures sensor with the result payload
+      default: true
+      selector:
+        boolean:

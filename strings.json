@@ -1,0 +1,194 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Tisseo Configuration",
+        "description": "Configure global Tisseo settings.\n\nYou can use **mock mode** to test without an API key, or enter your Tisseo API key for real data.\n\nTo get an API key, email opendata@tisseo.fr",
+        "data": {
+          "api_key": "API Key (optional if using mock mode)",
+          "use_mock_data": "Use mock data (for testing)",
+          "update_strategy": "Update mode",
+          "static_interval": "Regular update interval (seconds)",
+          "messages_refresh_interval": "Messages endpoint refresh interval (seconds, 0 = disabled)",
+          "outages_refresh_interval": "Outages endpoint refresh interval (seconds, 0 = disabled)",
+          "debug": "Debug mode (logs API calls and responses)"
+        }
+      },
+      "transport_mode": {
+        "title": "Select Transport Mode",
+        "description": "Choose the type of transport you want to monitor.",
+        "data": {
+          "transport_mode": "Transport mode"
+        }
+      },
+      "line": {
+        "title": "Select Line",
+        "description": "Choose the line you want to monitor.",
+        "data": {
+          "line": "Line"
+        }
+      },
+      "route": {
+        "title": "Select Direction",
+        "description": "Choose the direction of travel.",
+        "data": {
+          "route": "Direction"
+        }
+      },
+      "stop": {
+        "title": "Select Stop",
+        "description": "Choose the stop you want to monitor.",
+        "data": {
+          "stop_id": "Stop"
+        }
+      },
+      "options": {
+        "title": "Options",
+        "description": "Configure alert settings for this stop.",
+        "data": {
+          "imminent_threshold": "Imminent departure alert (minutes)",
+          "messages_refresh_interval": "Messages endpoint refresh interval (seconds, 0 = disabled)",
+          "outages_refresh_interval": "Outages endpoint refresh interval (seconds, 0 = disabled)",
+          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
+          "active_windows": "Time windows"
+        }
+      },
+      "schedule": {
+        "title": "Time Windows",
+        "description": "Configure all smart-update windows in one place.\n\nCurrent windows: {windows}",
+        "data": {
+          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
+          "active_windows": "Time windows"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Tisseo",
+        "description": "Your Tisseo API key is no longer valid. Please enter a new API key.\n\nTo get an API key, email opendata@tisseo.fr",
+        "data": {
+          "api_key": "New API Key"
+        }
+      }
+    },
+    "error": {
+      "api_key_required": "API key is required when not using mock mode",
+      "invalid_auth": "Invalid API key",
+      "cannot_connect": "Cannot connect to Tisseo API",
+      "mode_required": "Please select a transport mode",
+      "line_required": "Please select a line",
+      "route_required": "Please select a direction",
+      "stop_required": "Please select a stop",
+      "stop_already_configured": "This stop is already configured",
+      "invalid_time_range": "Start time must be before end time",
+      "no_windows_configured": "At least one time window is required",
+      "window_definition_invalid": "Invalid time window configuration",
+      "no_windows_to_remove": "There are no time windows to remove",
+      "window_days_required": "Please select at least one day"
+    },
+    "abort": {
+      "already_configured": "This stop is already configured",
+      "no_transport_modes": "No transport modes available",
+      "no_lines": "No lines available for this transport mode",
+      "no_routes": "No routes available for this line",
+      "no_stops": "No stops available for this route",
+      "reauth_successful": "Re-authentication successful"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Tisseo Options",
+        "description": "Configure alert settings for this stop.",
+        "data": {
+          "imminent_threshold": "Imminent departure alert (minutes)",
+          "api_key": "New API key (leave empty to keep current)",
+          "messages_refresh_interval": "Messages endpoint refresh interval (seconds, 0 = disabled)",
+          "outages_refresh_interval": "Outages endpoint refresh interval (seconds, 0 = disabled)",
+          "debug": "Debug mode (logs API calls and responses)",
+          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
+          "active_windows": "Time windows"
+        }
+      },
+      "menu": {
+        "title": "Tisseo Options",
+        "description": "Current update mode: {current_strategy}",
+        "menu_options": {
+          "edit_settings": "Edit settings",
+          "update_strategy": "Change update strategy"
+        }
+      },
+      "edit_settings": {
+        "title": "Global Settings",
+        "description": "Configure global update settings.\n\nCurrent update mode: {current_strategy}\n\nCurrent windows: {windows}",
+        "data": {
+          "static_interval": "Regular update interval (seconds)",
+          "api_key": "New API key (leave empty to keep current)",
+          "messages_refresh_interval": "Messages endpoint refresh interval (seconds, 0 = disabled)",
+          "outages_refresh_interval": "Outages endpoint refresh interval (seconds, 0 = disabled)",
+          "debug": "Debug mode (logs API calls and responses)",
+          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
+          "active_windows": "Time windows"
+        }
+      },
+      "update_strategy": {
+        "title": "Update Strategy",
+        "description": "Current update mode: {current_strategy}\n\nSelect a new update mode.",
+        "data": {
+          "update_strategy": "Update mode"
+        }
+      },
+      "schedule": {
+        "title": "Time Windows",
+        "description": "Configure all smart-update windows in one place.\n\nCurrent windows: {windows}",
+        "data": {
+          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
+          "active_windows": "Time windows"
+        }
+      }
+    }
+  },
+  "issues": {
+    "api_failure": {
+      "title": "Tisseo API unreachable for {stop_name}",
+      "description": "The Tisseo API has been unreachable for {failures} consecutive attempts. The last error was:\n\n`{error}`\n\nDeparture data may be stale. The integration will automatically recover when the API becomes available again."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "next_departure": {
+        "name": "Next departure"
+      },
+      "minutes_until": {
+        "name": "Minutes until departure"
+      },
+      "next_line": {
+        "name": "Line"
+      },
+      "next_destination": {
+        "name": "Destination"
+      },
+      "departures": {
+        "name": "Departures"
+      },
+      "api_calls_total": {
+        "name": "API calls total"
+      },
+      "api_calls_successful": {
+        "name": "API calls successful"
+      },
+      "api_calls_failed": {
+        "name": "API calls failed"
+      },
+      "api_calls_today": {
+        "name": "API calls today"
+      }
+    },
+    "binary_sensor": {
+      "imminent": {
+        "name": "Imminent departure"
+      },
+      "alerts": {
+        "name": "Service alerts"
+      }
+    }
+  }
+}
