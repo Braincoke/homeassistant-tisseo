@@ -51,6 +51,8 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         stop_id: str,
         stop_name: str,
         line_id: str | None = None,
+        line_color: str | None = None,
+        line_text_color: str | None = None,
         route_id: str | None = None,
         update_strategy: str = UPDATE_STRATEGY_SMART,
         static_interval: int = DEFAULT_SCAN_INTERVAL,
@@ -65,6 +67,8 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.stop_id = stop_id
         self.stop_name = stop_name
         self.line_id = line_id
+        self.line_color = line_color
+        self.line_text_color = line_text_color
         self.route_id = route_id
         self._update_strategy = update_strategy
         self._static_interval = static_interval
@@ -480,6 +484,8 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     {
                         "line_short_name": dep.line_short_name,
                         "line_name": dep.line_name,
+                        "line_color": dep.line_color or self.line_color or "#808080",
+                        "line_text_color": dep.line_text_color or self.line_text_color or "#FFFFFF",
                         "destination": dep.destination,
                         "departure_time": dep.departure_time.isoformat(),
                         "waiting_time": dep.waiting_time,
@@ -532,6 +538,13 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 route_id=self.route_id,
                 number=10,
             )
+            if self.departures:
+                # Backfill static line colors for legacy entries created before
+                # line colors were persisted in config entry data.
+                if not self.line_color:
+                    self.line_color = self.departures[0].line_color
+                if not self.line_text_color:
+                    self.line_text_color = self.departures[0].line_text_color
             _LOGGER.debug(
                 "Got %d departures for %s", len(self.departures), self.stop_name
             )

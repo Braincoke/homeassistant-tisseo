@@ -30,7 +30,9 @@ from .const import (
     CONF_IMMINENT_THRESHOLD,
     CONF_INACTIVE_INTERVAL,
     CONF_LINE,
+    CONF_LINE_COLOR,
     CONF_LINE_NAME,
+    CONF_LINE_TEXT_COLOR,
     CONF_MESSAGES_REFRESH_INTERVAL,
     CONF_OUTAGES_REFRESH_INTERVAL,
     CONF_ROUTE,
@@ -232,6 +234,8 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._transport_mode_name: str | None = None
         self._line_id: str | None = None
         self._line_name: str | None = None
+        self._line_color: str | None = None
+        self._line_text_color: str | None = None
         self._route_id: str | None = None
         self._route_direction: str | None = None
         self._stop_id: str | None = None
@@ -289,6 +293,8 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_STOP_NAME: self._stop_name,
                 CONF_LINE: self._line_id,
                 CONF_LINE_NAME: self._line_name,
+                CONF_LINE_COLOR: self._line_color,
+                CONF_LINE_TEXT_COLOR: self._line_text_color,
                 CONF_ROUTE: self._route_id,
                 CONF_ROUTE_DIRECTION: self._route_direction,
                 CONF_TRANSPORT_MODE: self._transport_mode_name,
@@ -719,6 +725,8 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 for line in lines:
                     if line.id == self._line_id:
                         self._line_name = line.short_name
+                        self._line_color = line.color
+                        self._line_text_color = line.text_color
                         break
                 return await self.async_step_route()
             errors["base"] = "line_required"

@@ -25,7 +25,9 @@ from .const import (
     CONF_DEBUG,
     CONF_INACTIVE_INTERVAL,
     CONF_LINE,
+    CONF_LINE_COLOR,
     CONF_MESSAGES_REFRESH_INTERVAL,
+    CONF_LINE_TEXT_COLOR,
     CONF_OUTAGES_REFRESH_INTERVAL,
     CONF_ROUTE,
     CONF_SCHEDULE_ENABLED,
@@ -357,6 +359,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: TisseoConfigEntry) -> bo
     stop_id = entry.data[CONF_STOP_ID]
     stop_name = entry.data.get(CONF_STOP_NAME, stop_id)
     line_id = entry.data.get(CONF_LINE)
+    line_color = entry.data.get(CONF_LINE_COLOR)
+    line_text_color = entry.data.get(CONF_LINE_TEXT_COLOR)
     route_id = entry.data.get(CONF_ROUTE)
 
     # Get update settings (mutable — prefer options, fall back to data)
@@ -410,6 +414,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: TisseoConfigEntry) -> bo
         stop_id=stop_id,
         stop_name=stop_name,
         line_id=line_id,
+        line_color=line_color,
+        line_text_color=line_text_color,
         route_id=route_id,
         update_strategy=update_strategy,
         static_interval=static_interval,
