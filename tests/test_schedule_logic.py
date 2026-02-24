@@ -25,7 +25,6 @@ def _make_schedule_coordinator(active_windows: list[dict]) -> TisseoStopCoordina
     coord = object.__new__(TisseoStopCoordinator)
     coord._schedule_enabled = True
     coord._active_windows = active_windows
-    coord._inactive_interval = 0
     coord._is_currently_active = None
     coord.stop_name = "Test stop"
     coord._boundary_timer = None

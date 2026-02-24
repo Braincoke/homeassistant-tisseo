@@ -116,9 +116,8 @@ C'est le meilleur compromis pour la majorité des utilisateurs et la meilleure f
 
 Fonctionnement :
 - Pendant les fenêtres actives configurées, l'intégration utilise la logique **smart** avec l'API temps réel.
-- Hors fenêtres, elle utilise l'**intervalle hors fenêtre** configuré mais sert les départs depuis le **cache GTFS**.
+- Hors fenêtres, elle met à jour les départs depuis le **cache GTFS** (horaires théoriques).
 - Hors fenêtres, le fallback vers l'API temps réel est désactivé pour les départs.
-- Mettez l'intervalle hors fenêtre à `0` pour désactiver toute mise à jour hors fenêtre.
 
 Cas d'usage typique :
 - Fenêtre trajet du matin (par exemple `06:30-09:00`)

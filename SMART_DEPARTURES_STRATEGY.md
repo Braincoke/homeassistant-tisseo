@@ -67,7 +67,7 @@ If you expected request logs but see none, check:
 1. `Debug mode` must be enabled in Tisseo options.
 2. Home Assistant logger level must include `custom_components.tisseo: debug`.
 3. Smart mode can intentionally wait a long time if next departure is far away (it refreshes at `T-60s`).
-4. In time-window strategy, outside active windows uses GTFS-based departures; if off-window interval is `0`, no polling is expected.
+4. In time-window strategy, outside active windows uses GTFS-based departures instead of realtime API departures.
 
 ## How To Validate Smart Mode Is Working
 

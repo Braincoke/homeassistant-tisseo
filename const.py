@@ -44,7 +44,6 @@ COUNTDOWN_UPDATE_INTERVAL: Final = 30  # Update displayed countdown every 30 sec
 # Schedule configuration
 CONF_SCHEDULE_ENABLED: Final = "schedule_enabled"
 CONF_ACTIVE_WINDOWS: Final = "active_windows"
-CONF_INACTIVE_INTERVAL: Final = "inactive_interval"
 
 # Active window keys
 CONF_WINDOW_NAME: Final = "name"
@@ -54,7 +53,6 @@ CONF_WINDOW_END: Final = "end"
 
 # Schedule defaults
 DEFAULT_SCHEDULE_ENABLED: Final = False
-DEFAULT_INACTIVE_INTERVAL: Final = 0  # 0 = no updates when inactive
 
 # Day constants for selector
 DAYS_OF_WEEK: Final = [

@@ -12,7 +12,6 @@ from .const import (
     CONF_ACTIVE_WINDOWS,
     CONF_DEBUG,
     CONF_IMMINENT_THRESHOLD,
-    CONF_INACTIVE_INTERVAL,
     CONF_LINE,
     CONF_LINE_NAME,
     CONF_MESSAGES_REFRESH_INTERVAL,
@@ -114,10 +113,6 @@ async def async_get_config_entry_diagnostics(
                 "schedule_enabled": entry.options.get(
                     CONF_SCHEDULE_ENABLED,
                     entry.data.get(CONF_SCHEDULE_ENABLED),
-                ),
-                "inactive_interval": entry.options.get(
-                    CONF_INACTIVE_INTERVAL,
-                    entry.data.get(CONF_INACTIVE_INTERVAL),
                 ),
                 "active_windows": entry.options.get(
                     CONF_ACTIVE_WINDOWS,

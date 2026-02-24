@@ -9,7 +9,6 @@ from custom_components.tisseo.const import (
     CONF_ACTIVE_WINDOWS,
     CONF_DEBUG,
     CONF_IMMINENT_THRESHOLD,
-    CONF_INACTIVE_INTERVAL,
     CONF_MESSAGES_REFRESH_INTERVAL,
     CONF_OUTAGES_REFRESH_INTERVAL,
     CONF_SCHEDULE_ENABLED,
@@ -20,7 +19,6 @@ from custom_components.tisseo.const import (
     CONF_WINDOW_END,
     CONF_WINDOW_NAME,
     CONF_WINDOW_START,
-    DEFAULT_INACTIVE_INTERVAL,
     DEFAULT_IMMINENT_THRESHOLD,
     DEFAULT_STATIC_INTERVAL,
     UPDATE_STRATEGY_SMART,
@@ -50,7 +48,6 @@ async def test_init_non_window_mode_clears_schedule() -> None:
                         CONF_WINDOW_END: "09:00:00",
                     }
                 ],
-                CONF_INACTIVE_INTERVAL: 300,
             }
         )
     )
@@ -73,7 +70,6 @@ async def test_init_non_window_mode_clears_schedule() -> None:
     assert result["type"] == "create_entry"
     assert result["data"][CONF_SCHEDULE_ENABLED] is False
     assert result["data"][CONF_ACTIVE_WINDOWS] == []
-    assert result["data"][CONF_INACTIVE_INTERVAL] == DEFAULT_INACTIVE_INTERVAL
     assert result["data"][CONF_MESSAGES_REFRESH_INTERVAL] == 600
     assert result["data"][CONF_OUTAGES_REFRESH_INTERVAL] == 900
 
@@ -95,7 +91,6 @@ async def test_init_time_window_saves_multiple_windows() -> None:
             CONF_DEBUG: False,
             CONF_MESSAGES_REFRESH_INTERVAL: 420,
             CONF_OUTAGES_REFRESH_INTERVAL: 840,
-            CONF_INACTIVE_INTERVAL: 300,
             CONF_ACTIVE_WINDOWS: [
                 {
                     CONF_WINDOW_NAME: " Morning commute ",
@@ -114,7 +109,6 @@ async def test_init_time_window_saves_multiple_windows() -> None:
 
     assert result["type"] == "create_entry"
     assert result["data"][CONF_SCHEDULE_ENABLED] is True
-    assert result["data"][CONF_INACTIVE_INTERVAL] == 300
     assert result["data"][CONF_MESSAGES_REFRESH_INTERVAL] == 420
     assert result["data"][CONF_OUTAGES_REFRESH_INTERVAL] == 840
     assert result["data"][CONF_ACTIVE_WINDOWS] == [
@@ -143,7 +137,6 @@ async def test_init_time_window_requires_at_least_one_window() -> None:
         {
             CONF_STATIC_INTERVAL: DEFAULT_STATIC_INTERVAL,
             CONF_DEBUG: False,
-            CONF_INACTIVE_INTERVAL: DEFAULT_INACTIVE_INTERVAL,
             CONF_ACTIVE_WINDOWS: [],
         }
     )
@@ -163,7 +156,6 @@ async def test_init_time_window_rejects_invalid_time_range() -> None:
         {
             CONF_STATIC_INTERVAL: DEFAULT_STATIC_INTERVAL,
             CONF_DEBUG: False,
-            CONF_INACTIVE_INTERVAL: DEFAULT_INACTIVE_INTERVAL,
             CONF_ACTIVE_WINDOWS: [
                 {
                     CONF_WINDOW_NAME: "Invalid",

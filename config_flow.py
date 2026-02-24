@@ -28,7 +28,6 @@ from .const import (
     CONF_API_KEY,
     CONF_DEBUG,
     CONF_IMMINENT_THRESHOLD,
-    CONF_INACTIVE_INTERVAL,
     CONF_LINE,
     CONF_LINE_COLOR,
     CONF_LINE_NAME,
@@ -49,7 +48,6 @@ from .const import (
     CONF_WINDOW_NAME,
     CONF_WINDOW_START,
     DAYS_OF_WEEK,
-    DEFAULT_INACTIVE_INTERVAL,
     DEFAULT_IMMINENT_THRESHOLD,
     DEFAULT_MESSAGES_REFRESH_INTERVAL,
     DEFAULT_OUTAGES_REFRESH_INTERVAL,
@@ -242,7 +240,6 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._stop_name: str | None = None
         self._imminent_threshold: int = DEFAULT_IMMINENT_THRESHOLD
         self._active_windows: list[dict[str, Any]] = []
-        self._inactive_interval: int = DEFAULT_INACTIVE_INTERVAL
         self._messages_refresh_interval: int = DEFAULT_MESSAGES_REFRESH_INTERVAL
         self._outages_refresh_interval: int = DEFAULT_OUTAGES_REFRESH_INTERVAL
 
@@ -267,7 +264,6 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         *,
         schedule_enabled: bool,
         active_windows: list[dict[str, Any]],
-        inactive_interval: int,
     ) -> ConfigFlowResult:
         """Create the final config entry and close transient client."""
         await self._async_close_client()
@@ -303,7 +299,6 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_OUTAGES_REFRESH_INTERVAL: self._outages_refresh_interval,
                 CONF_SCHEDULE_ENABLED: schedule_enabled,
                 CONF_ACTIVE_WINDOWS: active_windows,
-                CONF_INACTIVE_INTERVAL: inactive_interval,
             },
         )
 
@@ -312,7 +307,6 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         *,
         schedule_enabled: bool,
         active_windows: list[dict[str, Any]],
-        inactive_interval: int,
     ) -> ConfigFlowResult:
         """Create the dedicated global hub entry (API usage + shared settings)."""
         await self._async_close_client()
@@ -331,7 +325,6 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_OUTAGES_REFRESH_INTERVAL: self._outages_refresh_interval,
                 CONF_SCHEDULE_ENABLED: schedule_enabled,
                 CONF_ACTIVE_WINDOWS: active_windows,
-                CONF_INACTIVE_INTERVAL: inactive_interval,
             },
         )
 
@@ -343,7 +336,7 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return entry
         return entries[0] if entries else None
 
-    def _get_existing_schedule_settings(self) -> tuple[list[dict[str, Any]], int]:
+    def _get_existing_schedule_settings(self) -> list[dict[str, Any]]:
         """Get schedule settings from an existing entry if available."""
         entry = self._get_global_entry()
         if entry is not None:
@@ -351,14 +344,8 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_ACTIVE_WINDOWS,
                 entry.data.get(CONF_ACTIVE_WINDOWS, []),
             )
-            inactive = int(
-                entry.options.get(
-                    CONF_INACTIVE_INTERVAL,
-                    entry.data.get(CONF_INACTIVE_INTERVAL, DEFAULT_INACTIVE_INTERVAL),
-                )
-            )
-            return windows, inactive
-        return [], DEFAULT_INACTIVE_INTERVAL
+            return windows if isinstance(windows, list) else []
+        return []
 
     def _get_existing_credentials(self) -> tuple[str | None, bool, bool]:
         """Get API credentials from an existing entry if available."""
@@ -447,18 +434,13 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._messages_refresh_interval,
                 self._outages_refresh_interval,
             ) = self._get_existing_settings()
-            self._active_windows, self._inactive_interval = self._get_existing_schedule_settings()
+            self._active_windows = self._get_existing_schedule_settings()
 
             if not has_dedicated_hub_entry:
                 schedule_enabled = self._update_strategy == UPDATE_STRATEGY_TIME_WINDOW
                 return await self._async_create_hub_entry(
                     schedule_enabled=schedule_enabled,
                     active_windows=self._active_windows if schedule_enabled else [],
-                    inactive_interval=(
-                        self._inactive_interval
-                        if schedule_enabled
-                        else DEFAULT_INACTIVE_INTERVAL
-                    ),
                 )
             return await self.async_step_transport_mode()
 
@@ -534,7 +516,6 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         return await self._async_create_hub_entry(
                             schedule_enabled=False,
                             active_windows=[],
-                            inactive_interval=DEFAULT_INACTIVE_INTERVAL,
                         )
 
         # Show the API configuration form
@@ -607,13 +588,9 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Configure global time windows when time-window strategy is selected."""
         errors: dict[str, str] = {}
-        form_inactive_interval = self._inactive_interval
         form_windows = self._active_windows
 
         if user_input is not None:
-            form_inactive_interval = int(
-                user_input.get(CONF_INACTIVE_INTERVAL, self._inactive_interval)
-            )
             raw_windows = user_input.get(CONF_ACTIVE_WINDOWS, [])
             form_windows = raw_windows if isinstance(raw_windows, list) else []
             windows, error = _normalize_windows(raw_windows)
@@ -623,30 +600,16 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             elif not windows:
                 errors["base"] = "no_windows_configured"
             else:
-                self._inactive_interval = form_inactive_interval
                 self._active_windows = windows
                 return await self._async_create_hub_entry(
                     schedule_enabled=True,
                     active_windows=windows,
-                    inactive_interval=form_inactive_interval,
                 )
 
         return self.async_show_form(
             step_id="schedule",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(
-                        CONF_INACTIVE_INTERVAL,
-                        default=form_inactive_interval,
-                    ): NumberSelector(
-                        NumberSelectorConfig(
-                            min=0,
-                            max=3600,
-                            step=60,
-                            unit_of_measurement="s",
-                            mode=NumberSelectorMode.SLIDER,
-                        )
-                    ),
                     vol.Optional(
                         CONF_ACTIVE_WINDOWS,
                         default=form_windows,
@@ -899,13 +862,11 @@ class TisseoConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self._async_create_config_entry(
                     schedule_enabled=True,
                     active_windows=self._active_windows,
-                    inactive_interval=self._inactive_interval,
                 )
 
             return await self._async_create_config_entry(
                 schedule_enabled=False,
                 active_windows=[],
-                inactive_interval=DEFAULT_INACTIVE_INTERVAL,
             )
 
         return self.async_show_form(
@@ -1113,15 +1074,6 @@ class TisseoOptionsFlowHandler(config_entries.OptionsFlow):
                 ),
             )
         )
-        current_inactive_interval = int(
-            self._config_entry.options.get(
-                CONF_INACTIVE_INTERVAL,
-                self._config_entry.data.get(
-                    CONF_INACTIVE_INTERVAL,
-                    DEFAULT_INACTIVE_INTERVAL,
-                ),
-            )
-        )
         current_windows = self._config_entry.options.get(
             CONF_ACTIVE_WINDOWS,
             self._config_entry.data.get(CONF_ACTIVE_WINDOWS, []),
@@ -1131,7 +1083,6 @@ class TisseoOptionsFlowHandler(config_entries.OptionsFlow):
         form_debug = bool(current_debug)
         form_messages_refresh_interval = current_messages_refresh_interval
         form_outages_refresh_interval = current_outages_refresh_interval
-        form_inactive_interval = current_inactive_interval
         form_windows = current_windows if isinstance(current_windows, list) else []
         current_api_key = self._config_entry.data.get(CONF_API_KEY, "")
         pending_api_key: str | None = None
@@ -1150,9 +1101,6 @@ class TisseoOptionsFlowHandler(config_entries.OptionsFlow):
                     CONF_OUTAGES_REFRESH_INTERVAL,
                     current_outages_refresh_interval,
                 )
-            )
-            form_inactive_interval = int(
-                user_input.get(CONF_INACTIVE_INTERVAL, current_inactive_interval)
             )
             raw_windows = user_input.get(CONF_ACTIVE_WINDOWS, current_windows)
             form_windows = raw_windows if isinstance(raw_windows, list) else []
@@ -1202,7 +1150,6 @@ class TisseoOptionsFlowHandler(config_entries.OptionsFlow):
                             CONF_OUTAGES_REFRESH_INTERVAL: form_outages_refresh_interval,
                             CONF_SCHEDULE_ENABLED: True,
                             CONF_ACTIVE_WINDOWS: windows,
-                            CONF_INACTIVE_INTERVAL: form_inactive_interval,
                         },
                     )
 
@@ -1225,13 +1172,11 @@ class TisseoOptionsFlowHandler(config_entries.OptionsFlow):
                         CONF_OUTAGES_REFRESH_INTERVAL: form_outages_refresh_interval,
                         CONF_SCHEDULE_ENABLED: False,
                         CONF_ACTIVE_WINDOWS: [],
-                        CONF_INACTIVE_INTERVAL: DEFAULT_INACTIVE_INTERVAL,
                     },
                 )
 
         if form_strategy != UPDATE_STRATEGY_TIME_WINDOW:
             form_windows = []
-            form_inactive_interval = DEFAULT_INACTIVE_INTERVAL
 
         schema_dict: dict[Any, Any] = {
             vol.Optional(CONF_DEBUG, default=form_debug): bool,
@@ -1279,20 +1224,6 @@ class TisseoOptionsFlowHandler(config_entries.OptionsFlow):
                 )
             )
         if form_strategy == UPDATE_STRATEGY_TIME_WINDOW:
-            schema_dict[
-                vol.Optional(
-                    CONF_INACTIVE_INTERVAL,
-                    default=form_inactive_interval,
-                )
-            ] = NumberSelector(
-                NumberSelectorConfig(
-                    min=0,
-                    max=3600,
-                    step=60,
-                    unit_of_measurement="s",
-                    mode=NumberSelectorMode.SLIDER,
-                )
-            )
             schema_dict[
                 vol.Optional(
                     CONF_ACTIVE_WINDOWS,

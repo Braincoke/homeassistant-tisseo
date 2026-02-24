@@ -11,7 +11,6 @@ from custom_components.tisseo.const import (
     CONF_IMMINENT_THRESHOLD,
     CONF_LINE,
     CONF_ACTIVE_WINDOWS,
-    CONF_INACTIVE_INTERVAL,
     CONF_MESSAGES_REFRESH_INTERVAL,
     CONF_OUTAGES_REFRESH_INTERVAL,
     CONF_ROUTE,
@@ -27,7 +26,6 @@ from custom_components.tisseo.const import (
     COUNTDOWN_UPDATE_INTERVAL,
     DAYS_OF_WEEK,
     DAY_TO_WEEKDAY,
-    DEFAULT_INACTIVE_INTERVAL,
     DEFAULT_IMMINENT_THRESHOLD,
     DEFAULT_MESSAGES_REFRESH_INTERVAL,
     DEFAULT_OUTAGES_REFRESH_INTERVAL,
@@ -71,7 +69,7 @@ class TestConfigKeys:
             CONF_IMMINENT_THRESHOLD,
             CONF_SCHEDULE_ENABLED, CONF_ACTIVE_WINDOWS,
             CONF_MESSAGES_REFRESH_INTERVAL, CONF_OUTAGES_REFRESH_INTERVAL,
-            CONF_INACTIVE_INTERVAL, CONF_WINDOW_DAYS,
+            CONF_WINDOW_DAYS,
             CONF_WINDOW_START, CONF_WINDOW_END, CONF_WINDOW_NAME,
         ]
         for key in keys:
@@ -85,7 +83,7 @@ class TestConfigKeys:
             CONF_UPDATE_STRATEGY, CONF_STATIC_INTERVAL,
             CONF_MESSAGES_REFRESH_INTERVAL, CONF_OUTAGES_REFRESH_INTERVAL,
             CONF_SCHEDULE_ENABLED, CONF_ACTIVE_WINDOWS,
-            CONF_INACTIVE_INTERVAL, CONF_WINDOW_DAYS,
+            CONF_WINDOW_DAYS,
             CONF_WINDOW_START, CONF_WINDOW_END, CONF_WINDOW_NAME,
         ]
         assert len(keys) == len(set(keys))
@@ -155,7 +153,6 @@ class TestScheduleConstants:
 
     def test_schedule_defaults(self):
         assert DEFAULT_SCHEDULE_ENABLED is False
-        assert DEFAULT_INACTIVE_INTERVAL == 0
 
     def test_days_of_week_shape(self):
         assert len(DAYS_OF_WEEK) == 7

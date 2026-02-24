@@ -46,18 +46,13 @@
         "title": "Options",
         "description": "Configurez les paramètres d'alerte pour cet arrêt.",
         "data": {
-          "imminent_threshold": "Alerte départ imminent (minutes)",
-          "messages_refresh_interval": "Intervalle de rafraîchissement des messages (secondes, 0 = désactivé)",
-          "outages_refresh_interval": "Intervalle de rafraîchissement des pannes (secondes, 0 = désactivé)",
-          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
-          "active_windows": "Créneaux horaires"
+          "imminent_threshold": "Alerte départ imminent (minutes)"
         }
       },
       "schedule": {
         "title": "Créneaux horaires",
         "description": "Configurez tous les créneaux de mise à jour intelligente au même endroit.\n\nCréneaux actuels : {windows}",
         "data": {
-          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
           "active_windows": "Créneaux horaires"
         }
       },
@@ -99,13 +94,7 @@
         "title": "Options Tisseo",
         "description": "Configurez les paramètres d'alerte pour cet arrêt.",
         "data": {
-          "imminent_threshold": "Alerte départ imminent (minutes)",
-          "api_key": "Nouvelle clé API (laisser vide pour conserver l'actuelle)",
-          "messages_refresh_interval": "Intervalle de rafraîchissement des messages (secondes, 0 = désactivé)",
-          "outages_refresh_interval": "Intervalle de rafraîchissement des pannes (secondes, 0 = désactivé)",
-          "debug": "Mode debug (journalise les appels et réponses API)",
-          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
-          "active_windows": "Créneaux horaires"
+          "imminent_threshold": "Alerte départ imminent (minutes)"
         }
       },
       "menu": {
@@ -125,7 +114,6 @@
           "messages_refresh_interval": "Intervalle de rafraîchissement des messages (secondes, 0 = désactivé)",
           "outages_refresh_interval": "Intervalle de rafraîchissement des pannes (secondes, 0 = désactivé)",
           "debug": "Mode debug (journalise les appels et réponses API)",
-          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
           "active_windows": "Créneaux horaires"
         }
       },
@@ -140,7 +128,6 @@
         "title": "Créneaux horaires",
         "description": "Configurez tous les créneaux de mise à jour intelligente au même endroit.\n\nCréneaux actuels : {windows}",
         "data": {
-          "inactive_interval": "Intervalle hors créneaux (secondes, 0 = aucune mise à jour)",
           "active_windows": "Créneaux horaires"
         }
       }

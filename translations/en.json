@@ -46,18 +46,13 @@
         "title": "Options",
         "description": "Configure alert settings for this stop.",
         "data": {
-          "imminent_threshold": "Imminent departure alert (minutes)",
-          "messages_refresh_interval": "Messages endpoint refresh interval (seconds, 0 = disabled)",
-          "outages_refresh_interval": "Outages endpoint refresh interval (seconds, 0 = disabled)",
-          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
-          "active_windows": "Time windows"
+          "imminent_threshold": "Imminent departure alert (minutes)"
         }
       },
       "schedule": {
         "title": "Time Windows",
         "description": "Configure all smart-update windows in one place.\n\nCurrent windows: {windows}",
         "data": {
-          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
           "active_windows": "Time windows"
         }
       },
@@ -99,13 +94,7 @@
         "title": "Tisseo Options",
         "description": "Configure alert settings for this stop.",
         "data": {
-          "imminent_threshold": "Imminent departure alert (minutes)",
-          "api_key": "New API key (leave empty to keep current)",
-          "messages_refresh_interval": "Messages endpoint refresh interval (seconds, 0 = disabled)",
-          "outages_refresh_interval": "Outages endpoint refresh interval (seconds, 0 = disabled)",
-          "debug": "Debug mode (logs API calls and responses)",
-          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
-          "active_windows": "Time windows"
+          "imminent_threshold": "Imminent departure alert (minutes)"
         }
       },
       "menu": {
@@ -125,7 +114,6 @@
           "messages_refresh_interval": "Messages endpoint refresh interval (seconds, 0 = disabled)",
           "outages_refresh_interval": "Outages endpoint refresh interval (seconds, 0 = disabled)",
           "debug": "Debug mode (logs API calls and responses)",
-          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
           "active_windows": "Time windows"
         }
       },
@@ -140,7 +128,6 @@
         "title": "Time Windows",
         "description": "Configure all smart-update windows in one place.\n\nCurrent windows: {windows}",
         "data": {
-          "inactive_interval": "Off-window update interval (seconds, 0 = no updates)",
           "active_windows": "Time windows"
         }
       }

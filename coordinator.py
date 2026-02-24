@@ -60,7 +60,6 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         outages_refresh_interval: int = DEFAULT_OUTAGES_REFRESH_INTERVAL,
         schedule_enabled: bool = False,
         active_windows: list[dict] | None = None,
-        inactive_interval: int = 0,
     ) -> None:
         """Initialize the coordinator."""
         self._client = client
@@ -78,7 +77,6 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Time-window scheduling
         self._schedule_enabled = schedule_enabled
         self._active_windows = active_windows or []
-        self._inactive_interval = inactive_interval
         self._boundary_timer: asyncio.TimerHandle | None = None
         self._is_currently_active: bool | None = None  # None = not yet determined
 
@@ -253,8 +251,8 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.hass.loop.call_soon(lambda: asyncio.create_task(self.async_refresh()))
 
     def _enter_inactive_mode(self) -> None:
-        """Switch to inactive mode and reduce/disable refresh behavior."""
-        _LOGGER.info("%s: Leaving active window, reducing updates", self.stop_name)
+        """Switch to inactive mode and use GTFS-based scheduling."""
+        _LOGGER.info("%s: Leaving active window, using GTFS-based updates", self.stop_name)
 
         if self._scheduled_refresh is not None:
             self._scheduled_refresh.cancel()
@@ -264,10 +262,17 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self._countdown_unsub()
             self._countdown_unsub = None
 
-        if self._inactive_interval > 0:
-            self.update_interval = timedelta(seconds=self._inactive_interval)
-        else:
+        if self._update_strategy == UPDATE_STRATEGY_TIME_WINDOW:
+            # Outside configured windows we keep refreshing with smart scheduling,
+            # but data source switches to GTFS in _async_update_data.
             self.update_interval = None
+            self._start_countdown_timer()
+            self.hass.loop.call_soon(
+                lambda: asyncio.create_task(self._async_smart_refresh())
+            )
+            return
+
+        self.update_interval = None
 
     def _schedule_boundary_timer(self) -> None:
         """Schedule the next timer for active/inactive boundary transition."""
@@ -541,10 +546,9 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except Exception as err:
             _LOGGER.error("Error during smart refresh: %s", err)
         finally:
-            if self._schedule_enabled and not self.is_in_active_window():
+            if self._schedule_enabled:
                 self._apply_scheduling_mode()
-            else:
-                self._schedule_next_smart_update()
+            self._schedule_next_smart_update()
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from Tisseo API."""

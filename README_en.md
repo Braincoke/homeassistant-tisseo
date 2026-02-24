@@ -107,9 +107,8 @@ Best balance for most users and best way to reduce API usage.
 
 How it works:
 - During configured active windows, it uses **smart** scheduling with realtime API departures.
-- Outside active windows, it keeps refreshing at the configured **off-window interval** but serves departures from **GTFS cached data**.
+- Outside active windows, it keeps departures updated from **GTFS cached schedule data**.
 - Outside active windows, realtime departures API fallback is disabled for departures.
-- Set off-window interval to `0` to disable updates outside windows.
 
 Typical use case:
 - Morning commute window (for example `06:30-09:00`)

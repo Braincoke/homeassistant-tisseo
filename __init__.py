@@ -23,7 +23,6 @@ from .const import (
     CONF_ACTIVE_WINDOWS,
     CONF_API_KEY,
     CONF_DEBUG,
-    CONF_INACTIVE_INTERVAL,
     CONF_LINE,
     CONF_LINE_COLOR,
     CONF_MESSAGES_REFRESH_INTERVAL,
@@ -36,10 +35,8 @@ from .const import (
     CONF_STOP_NAME,
     CONF_UPDATE_STRATEGY,
     CONF_USE_MOCK,
-    DEFAULT_INACTIVE_INTERVAL,
     DEFAULT_MESSAGES_REFRESH_INTERVAL,
     DEFAULT_OUTAGES_REFRESH_INTERVAL,
-    DEFAULT_SCHEDULE_ENABLED,
     DEFAULT_STATIC_INTERVAL,
     DEFAULT_UPDATE_STRATEGY,
     DOMAIN,
@@ -56,7 +53,6 @@ GLOBAL_OPTION_KEYS = (
     CONF_OUTAGES_REFRESH_INTERVAL,
     CONF_SCHEDULE_ENABLED,
     CONF_ACTIVE_WINDOWS,
-    CONF_INACTIVE_INTERVAL,
 )
 SYNC_IN_PROGRESS: set[str] = set()
 
@@ -388,24 +384,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: TisseoConfigEntry) -> bo
             ),
         )
     )
-    legacy_schedule_enabled = entry.options.get(
-        CONF_SCHEDULE_ENABLED,
-        entry.data.get(CONF_SCHEDULE_ENABLED, DEFAULT_SCHEDULE_ENABLED),
-    )
-    schedule_enabled = update_strategy == UPDATE_STRATEGY_TIME_WINDOW or legacy_schedule_enabled
+    schedule_enabled = update_strategy == UPDATE_STRATEGY_TIME_WINDOW
 
     if schedule_enabled:
         active_windows = entry.options.get(
             CONF_ACTIVE_WINDOWS,
             entry.data.get(CONF_ACTIVE_WINDOWS, []),
         )
-        inactive_interval = entry.options.get(
-            CONF_INACTIVE_INTERVAL,
-            entry.data.get(CONF_INACTIVE_INTERVAL, DEFAULT_INACTIVE_INTERVAL),
-        )
     else:
         active_windows = []
-        inactive_interval = DEFAULT_INACTIVE_INTERVAL
 
     # Create coordinator for this stop (uses the shared client)
     coordinator = TisseoStopCoordinator(
@@ -423,7 +410,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: TisseoConfigEntry) -> bo
         outages_refresh_interval=outages_refresh_interval,
         schedule_enabled=schedule_enabled,
         active_windows=active_windows,
-        inactive_interval=inactive_interval,
     )
 
     # Fetch initial data
