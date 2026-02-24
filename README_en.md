@@ -2,6 +2,20 @@
 
 A custom Home Assistant integration for [Tisseo](https://www.tisseo.fr/), the public transit network of Toulouse, France. Monitor real-time departures, service alerts, and transit information for any stop on the network (Metro, Tram, Bus, and Lineo lines).
 
+## Legal Disclaimer
+
+- This is an **unofficial** community Home Assistant integration.
+- I have **zero affiliation** with Tisseo.
+- The "Tisseo" name is used in this repository for discoverability only.
+- If Tisseo decides this repository cannot use that name, they can contact me at: `braincoke+contact@protonmail.com`.
+
+## Data License
+
+Transit data reused by this integration comes from Tisseo/Toulouse Metropole Open Data and is subject to **ODbL 1.0**.
+
+- ODbL full text: https://opendatacommons.org/licenses/odbl/1-0/
+- Toulouse Metropole license page: https://data.toulouse-metropole.fr/page/licence
+
 ## Features
 
 - **Guided setup wizard** - Select your transport mode, line, direction, and stop through a step-by-step config flow. No need to know stop IDs or API parameters.
@@ -225,4 +239,5 @@ Data provided by [Tisseo Open Data](https://data.toulouse-metropole.fr/).
 
 ## License
 
-MIT
+- Source code: [MIT](LICENSE)
+- Open Data: [ODbL 1.0](LICENSE-ODbL-1.0.md)
