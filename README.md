@@ -122,7 +122,7 @@ Fonctionnement :
 Cas d'usage typique :
 - Fenêtre trajet du matin (par exemple `06:30-09:00`)
 - Fenêtre fin de journée/soir (par exemple `16:30-20:00`)
-- Peu ou pas de polling en dehors de ces périodes
+- Aucun appel API départs temps réel en dehors de ces périodes
 
 ### Smart (par défaut si aucune fenêtre n'est configurée)
 

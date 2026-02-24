@@ -113,7 +113,7 @@ How it works:
 Typical use case:
 - Morning commute window (for example `06:30-09:00`)
 - Evening window (for example `16:30-20:00`)
-- Minimal or no polling outside those periods
+- No realtime departures API calls outside those periods
 
 ### Smart (default if no windows are configured)
 
