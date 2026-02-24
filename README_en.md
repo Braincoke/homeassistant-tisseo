@@ -19,6 +19,7 @@ Transit data reused by this integration comes from Tisseo/Toulouse Metropole Ope
 ## Features
 
 - **Guided setup wizard** - Select your transport mode, line, direction, and stop through a step-by-step config flow. No need to know stop IDs or API parameters.
+- **GTFS-backed referential data** - Transport modes, lines, directions, stop lists, and line colors are loaded from the official weekly GTFS feed when available, reducing realtime API usage.
 - **Three update strategies** - Choose between regular polling, smart departure-based scheduling, or time-window scheduling.
 - **Time-window strategy (recommended)** - Uses smart updates during the periods you actually check departures (for example morning/evening commute) and slower or no updates outside those windows to reduce API usage.
 - **Real-time departures** - Shows next departures with real-time vs scheduled indicators.
@@ -221,6 +222,7 @@ logger:
 ## Tisseo API Reference
 
 See [TISSEO_API_REFERENCE.md](TISSEO_API_REFERENCE.md) for detailed API documentation, endpoint details, and response structures.
+See [GTFS_USAGE.md](GTFS_USAGE.md) for GTFS coverage, fallback rules, and what still uses realtime APIs.
 For future-window planning (example: tomorrow 07:40-08:15 fetched at 20:00), see [PLANNED_WINDOW_DEPARTURES.md](PLANNED_WINDOW_DEPARTURES.md).
 
 ## Companion Cards

@@ -1,9 +1,15 @@
 """Tisseo API client."""
 from __future__ import annotations
 
+import asyncio
+import csv
+import io
 import logging
+import re
+import zipfile
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
@@ -18,6 +24,33 @@ from .const import API_BASE_URL, API_TIMEOUT
 TOULOUSE_TZ = ZoneInfo("Europe/Paris")
 
 _LOGGER = logging.getLogger(__name__)
+
+GTFS_DATASET_METADATA_URL = (
+    "https://data.toulouse-metropole.fr/api/explore/v2.1/catalog/datasets/tisseo-gtfs"
+)
+GTFS_DEFAULT_EXPORT_URL = (
+    "https://data.toulouse-metropole.fr/api/explore/v2.1/catalog/datasets/"
+    "tisseo-gtfs/alternative_exports/utf_8tisseo_gtfs_v2_zip"
+)
+GTFS_CACHE_TTL_SECONDS = 12 * 60 * 60
+GTFS_FAILURE_RETRY_SECONDS = 10 * 60
+GTFS_DOWNLOAD_TIMEOUT_SECONDS = 45
+GTFS_ROUTE_ID_PREFIX = "gtfs_dir"
+GTFS_MODE_IDS_ORDER = [
+    "gtfs:metro",
+    "gtfs:lineo",
+    "gtfs:tramway",
+    "gtfs:bus",
+    "gtfs:teleo",
+]
+GTFS_MODE_NAMES: dict[str, str] = {
+    "gtfs:metro": "Métro",
+    "gtfs:lineo": "Linéo",
+    "gtfs:tramway": "Tramway",
+    "gtfs:bus": "Bus",
+    "gtfs:teleo": "Téléo",
+}
+GTFS_LINEO_PATTERN = re.compile(r"^L\d+$", re.IGNORECASE)
 
 
 @dataclass
@@ -164,6 +197,19 @@ class TisseoConnectionError(TisseoApiError):
     """Connection error."""
 
 
+@dataclass
+class _GtfsHierarchyCache:
+    """Cached GTFS hierarchy for selector steps (modes/lines/routes/stops)."""
+
+    fetched_at: datetime
+    modes: list[TransportMode]
+    lines_by_mode: dict[str, list[Line]]
+    routes_by_line: dict[str, list[Route]]
+    stops_by_line_route: dict[tuple[str, str], list[Stop]]
+    stop_info_by_id: dict[str, StopInfo]
+    lines_by_stop_area: dict[str, list[dict[str, str]]]
+
+
 class TisseoApiClient:
     """Client for the Tisseo API."""
 
@@ -181,6 +227,20 @@ class TisseoApiClient:
         self._timeout = ClientTimeout(total=API_TIMEOUT)
         self._debug = debug
         self._usage_callback: Callable[[str, bool, int | None], None] | None = None
+        self._gtfs_cache: _GtfsHierarchyCache | None = None
+        self._gtfs_export_url: str = GTFS_DEFAULT_EXPORT_URL
+        self._gtfs_last_failure_at: datetime | None = None
+        self._gtfs_lock = asyncio.Lock()
+
+    @property
+    def api_key(self) -> str | None:
+        """Return API key used for realtime endpoints."""
+        return self._api_key
+
+    @api_key.setter
+    def api_key(self, value: str | None) -> None:
+        """Update API key used for realtime endpoints."""
+        self._api_key = value
 
     @property
     def debug(self) -> bool:
@@ -331,14 +391,407 @@ class TisseoApiClient:
         # Default empty response
         return {}
 
+    # ========== GTFS helpers ==========
+
+    async def _resolve_gtfs_export_url(self) -> str:
+        """Resolve the current GTFS export URL from dataset metadata."""
+        session = await self._get_session()
+        async with session.get(GTFS_DATASET_METADATA_URL) as response:
+            if response.status != 200:
+                raise TisseoApiError(
+                    f"GTFS metadata request failed with status {response.status}"
+                )
+            payload = await response.json()
+
+        exports = payload.get("alternative_exports", [])
+        if isinstance(exports, dict):
+            exports = [exports]
+
+        for export in exports:
+            if not isinstance(export, dict):
+                continue
+            title = str(export.get("title", "")).lower()
+            export_id = str(export.get("id", "")).lower()
+            mimetype = str(
+                export.get("mimetype", export.get("mime_type", ""))
+            ).lower()
+            if "zip" not in mimetype:
+                continue
+            if "gtfs" not in title and "gtfs" not in export_id:
+                continue
+            if (
+                "gtfsrt" in title
+                or "gtfs-rt" in title
+                or "gtfsrt" in export_id
+                or "gtfs-rt" in export_id
+            ):
+                continue
+
+            url = export.get("url")
+            if isinstance(url, str) and url:
+                return url
+
+        return GTFS_DEFAULT_EXPORT_URL
+
+    async def _download_gtfs_archive(self) -> bytes:
+        """Download the GTFS archive bytes."""
+        session = await self._get_session()
+        export_url = self._gtfs_export_url
+
+        try:
+            export_url = await self._resolve_gtfs_export_url()
+            self._gtfs_export_url = export_url
+        except Exception as err:  # pragma: no cover - network fallback path
+            _LOGGER.debug(
+                "Failed to resolve GTFS export URL dynamically, using fallback: %s",
+                err,
+            )
+
+        async with session.get(
+            export_url,
+            allow_redirects=True,
+            timeout=ClientTimeout(total=GTFS_DOWNLOAD_TIMEOUT_SECONDS),
+        ) as response:
+            if response.status != 200:
+                raise TisseoApiError(
+                    f"GTFS download request failed with status {response.status}"
+                )
+            content = await response.read()
+
+        if not content:
+            raise TisseoApiError("GTFS download returned an empty body")
+
+        return content
+
+    @staticmethod
+    def _normalize_color(value: str | None, default: str) -> str:
+        """Normalize GTFS color fields to #RRGGBB."""
+        raw = (value or "").strip().lstrip("#")
+        if len(raw) != 6:
+            return default
+        if not all(c in "0123456789abcdefABCDEF" for c in raw):
+            return default
+        return f"#{raw.upper()}"
+
+    @staticmethod
+    def _map_gtfs_mode(route_type: str, short_name: str) -> str:
+        """Map GTFS route_type + line short name to Tisseo mode buckets."""
+        if route_type == "1":
+            return "gtfs:metro"
+        if route_type == "0":
+            return "gtfs:tramway"
+        if route_type == "6":
+            return "gtfs:teleo"
+        if route_type == "3" and GTFS_LINEO_PATTERN.match(short_name):
+            return "gtfs:lineo"
+        return "gtfs:bus"
+
+    @staticmethod
+    def _make_gtfs_route_id(line_id: str, direction_id: str) -> str:
+        """Build a stable route id for GTFS-derived directions."""
+        return f"{GTFS_ROUTE_ID_PREFIX}:{line_id}:{direction_id}"
+
+    @staticmethod
+    def _read_gtfs_csv(
+        archive: zipfile.ZipFile, filename: str
+    ) -> list[dict[str, str]]:
+        """Read a GTFS CSV file from an archive."""
+        with archive.open(filename) as raw_file:
+            reader = csv.DictReader(io.TextIOWrapper(raw_file, encoding="utf-8-sig"))
+            return [
+                {
+                    str(k): (v if isinstance(v, str) else "")
+                    for k, v in row.items()
+                    if k is not None
+                }
+                for row in reader
+            ]
+
+    def _parse_gtfs_hierarchy(self, archive_bytes: bytes) -> _GtfsHierarchyCache:
+        """Parse GTFS static data into selectors hierarchy."""
+        with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
+            routes_rows = self._read_gtfs_csv(archive, "routes.txt")
+            trips_rows = self._read_gtfs_csv(archive, "trips.txt")
+            stops_rows = self._read_gtfs_csv(archive, "stops.txt")
+
+            selected_trip_by_direction: dict[tuple[str, str], str] = {}
+            headsign_counts: dict[tuple[str, str], Counter[str]] = defaultdict(Counter)
+            for trip in trips_rows:
+                line_id = trip.get("route_id", "").strip()
+                trip_id = trip.get("trip_id", "").strip()
+                if not line_id or not trip_id:
+                    continue
+
+                direction_id = trip.get("direction_id", "").strip() or "0"
+                key = (line_id, direction_id)
+
+                if key not in selected_trip_by_direction:
+                    selected_trip_by_direction[key] = trip_id
+
+                headsign = trip.get("trip_headsign", "").strip()
+                if headsign:
+                    headsign_counts[key][headsign] += 1
+
+            selected_trip_ids = set(selected_trip_by_direction.values())
+            stop_times_by_trip: dict[str, list[tuple[int, str]]] = defaultdict(list)
+            with archive.open("stop_times.txt") as raw_file:
+                reader = csv.DictReader(io.TextIOWrapper(raw_file, encoding="utf-8-sig"))
+                for row in reader:
+                    trip_id = str(row.get("trip_id", "")).strip()
+                    if trip_id not in selected_trip_ids:
+                        continue
+
+                    stop_id = str(row.get("stop_id", "")).strip()
+                    if not stop_id:
+                        continue
+
+                    try:
+                        stop_sequence = int(str(row.get("stop_sequence", "")).strip())
+                    except ValueError:
+                        continue
+
+                    stop_times_by_trip[trip_id].append((stop_sequence, stop_id))
+
+        stops_by_id: dict[str, dict[str, str]] = {}
+        for stop in stops_rows:
+            stop_id = stop.get("stop_id", "").strip()
+            if not stop_id:
+                continue
+            stops_by_id[stop_id] = {
+                "name": stop.get("stop_name", "").strip() or stop_id,
+                "parent_station": stop.get("parent_station", "").strip(),
+                "location_type": stop.get("location_type", "").strip() or "0",
+            }
+
+        lines_by_mode: dict[str, list[Line]] = defaultdict(list)
+        line_by_id: dict[str, Line] = {}
+        for route in routes_rows:
+            line_id = route.get("route_id", "").strip()
+            if not line_id:
+                continue
+
+            short_name = route.get("route_short_name", "").strip() or line_id
+            mode_id = self._map_gtfs_mode(
+                route.get("route_type", "").strip(),
+                short_name,
+            )
+            mode_name = GTFS_MODE_NAMES.get(mode_id, GTFS_MODE_NAMES["gtfs:bus"])
+
+            line = Line(
+                id=line_id,
+                short_name=short_name,
+                name=route.get("route_long_name", "").strip() or short_name,
+                color=self._normalize_color(route.get("route_color"), "#808080"),
+                text_color=self._normalize_color(
+                    route.get("route_text_color"), "#FFFFFF"
+                ),
+                transport_mode=mode_name,
+            )
+            line_by_id[line_id] = line
+            lines_by_mode[mode_id].append(line)
+
+        for lines in lines_by_mode.values():
+            lines.sort(key=lambda line: (line.short_name, line.name, line.id))
+
+        modes = [
+            TransportMode(id=mode_id, name=GTFS_MODE_NAMES[mode_id])
+            for mode_id in GTFS_MODE_IDS_ORDER
+            if lines_by_mode.get(mode_id)
+        ]
+
+        routes_by_line: dict[str, list[Route]] = defaultdict(list)
+        stops_by_line_route: dict[tuple[str, str], list[Stop]] = {}
+
+        used_route_ids_by_line: dict[str, set[str]] = defaultdict(set)
+        for (line_id, direction_id), trip_id in selected_trip_by_direction.items():
+            if line_id not in line_by_id:
+                continue
+
+            counter = headsign_counts[(line_id, direction_id)]
+            headsign = counter.most_common(1)[0][0] if counter else f"Direction {direction_id}"
+            stop_rows = stop_times_by_trip.get(trip_id, [])
+            ordered_stops = sorted(stop_rows, key=lambda item: item[0])
+
+            route_id = self._make_gtfs_route_id(line_id, direction_id)
+            if ordered_stops:
+                terminus_stop_id = ordered_stops[-1][1]
+                terminus_meta = stops_by_id.get(terminus_stop_id, {})
+                terminus_parent = terminus_meta.get("parent_station", "")
+                candidate_route_id = terminus_parent or terminus_stop_id
+                if candidate_route_id and candidate_route_id not in used_route_ids_by_line[line_id]:
+                    route_id = candidate_route_id
+
+            used_route_ids_by_line[line_id].add(route_id)
+            route = Route(
+                id=route_id,
+                name=headsign,
+                direction=headsign,
+            )
+            routes_by_line[line_id].append(route)
+
+            seen_names: set[str] = set()
+            route_stops: list[Stop] = []
+            for _, stop_id in ordered_stops:
+                stop_meta = stops_by_id.get(stop_id)
+                if not stop_meta:
+                    continue
+
+                stop_name = stop_meta["name"]
+                parent_station = stop_meta["parent_station"]
+                if parent_station and parent_station in stops_by_id:
+                    parent_name = stops_by_id[parent_station]["name"]
+                    if parent_name:
+                        stop_name = parent_name
+
+                if stop_name in seen_names:
+                    continue
+                seen_names.add(stop_name)
+
+                route_stops.append(
+                    Stop(
+                        id=stop_id,
+                        name=stop_name,
+                        display_name=f"{stop_name} (→ {headsign})",
+                    )
+                )
+
+            if route_stops:
+                stops_by_line_route[(line_id, route_id)] = route_stops
+
+        for line_id in routes_by_line:
+            routes_by_line[line_id].sort(key=lambda route: route.name)
+
+        stop_info_by_id: dict[str, StopInfo] = {}
+        for stop_id, stop_meta in stops_by_id.items():
+            stop_name = stop_meta["name"]
+            parent_station = stop_meta["parent_station"]
+            if parent_station and parent_station in stops_by_id:
+                parent_name = stops_by_id[parent_station]["name"]
+                if parent_name:
+                    stop_name = parent_name
+            stop_info_by_id[stop_id] = StopInfo(
+                stop_id=stop_id,
+                name=stop_name,
+                city="",
+            )
+
+        lines_by_stop_area_dedup: dict[str, dict[tuple[str, str], dict[str, str]]] = defaultdict(dict)
+        for (line_id, route_id), route_stops in stops_by_line_route.items():
+            line = line_by_id.get(line_id)
+            if line is None:
+                continue
+
+            route_direction = route_id
+            for route in routes_by_line.get(line_id, []):
+                if route.id == route_id:
+                    route_direction = route.direction
+                    break
+
+            for stop in route_stops:
+                stop_meta = stops_by_id.get(stop.id, {})
+                parent_station = stop_meta.get("parent_station", "")
+                stop_area_id = parent_station or stop.id
+
+                dedupe_key = (line_id, route_id)
+                lines_by_stop_area_dedup[stop_area_id][dedupe_key] = {
+                    "line_id": line.id,
+                    "line_short_name": line.short_name,
+                    "line_name": line.name,
+                    "line_color": line.color,
+                    "line_text_color": line.text_color,
+                    "transport_mode": line.transport_mode,
+                    "route_id": route_id,
+                    "direction": route_direction,
+                    "stop_id": stop_area_id,
+                }
+
+        lines_by_stop_area: dict[str, list[dict[str, str]]] = {}
+        for stop_area_id, values in lines_by_stop_area_dedup.items():
+            entries = list(values.values())
+            entries.sort(
+                key=lambda item: (
+                    item["line_short_name"],
+                    item["direction"],
+                    item["line_id"],
+                )
+            )
+            lines_by_stop_area[stop_area_id] = entries
+
+        return _GtfsHierarchyCache(
+            fetched_at=datetime.now(UTC),
+            modes=modes,
+            lines_by_mode=dict(lines_by_mode),
+            routes_by_line=dict(routes_by_line),
+            stops_by_line_route=stops_by_line_route,
+            stop_info_by_id=stop_info_by_id,
+            lines_by_stop_area=lines_by_stop_area,
+        )
+
+    async def _get_gtfs_hierarchy(self) -> _GtfsHierarchyCache | None:
+        """Return cached GTFS hierarchy, refreshing it when cache is stale."""
+        if self._use_mock:
+            return None
+
+        now = datetime.now(UTC)
+        cache = self._gtfs_cache
+        if cache and (now - cache.fetched_at).total_seconds() < GTFS_CACHE_TTL_SECONDS:
+            return cache
+        if (
+            cache is None
+            and self._gtfs_last_failure_at is not None
+            and (now - self._gtfs_last_failure_at).total_seconds()
+            < GTFS_FAILURE_RETRY_SECONDS
+        ):
+            return None
+
+        async with self._gtfs_lock:
+            now = datetime.now(UTC)
+            cache = self._gtfs_cache
+            if cache and (now - cache.fetched_at).total_seconds() < GTFS_CACHE_TTL_SECONDS:
+                return cache
+            if (
+                cache is None
+                and self._gtfs_last_failure_at is not None
+                and (now - self._gtfs_last_failure_at).total_seconds()
+                < GTFS_FAILURE_RETRY_SECONDS
+            ):
+                return None
+
+            try:
+                archive_bytes = await self._download_gtfs_archive()
+                parsed = await asyncio.to_thread(self._parse_gtfs_hierarchy, archive_bytes)
+                self._gtfs_cache = parsed
+                self._gtfs_last_failure_at = None
+                self._log_debug(
+                    "Loaded GTFS hierarchy: modes=%d lines=%d routes=%d",
+                    len(parsed.modes),
+                    sum(len(lines) for lines in parsed.lines_by_mode.values()),
+                    sum(len(routes) for routes in parsed.routes_by_line.values()),
+                )
+                return parsed
+            except Exception as err:
+                _LOGGER.warning(
+                    "Failed to load GTFS hierarchy; falling back to API endpoints: %s",
+                    err,
+                )
+                self._gtfs_last_failure_at = datetime.now(UTC)
+                if self._gtfs_cache is not None:
+                    _LOGGER.debug("Using stale GTFS cache after refresh failure")
+                    return self._gtfs_cache
+                return None
+
     # ========== Transport hierarchy methods ==========
 
     async def get_transport_modes(self) -> list[TransportMode]:
-        """Get available transport modes using rolling_stocks endpoint."""
+        """Get available transport modes, preferring GTFS static data."""
         if self._use_mock:
             from .mock_data import get_transport_modes
             modes = get_transport_modes()
             return [TransportMode(id=m["id"], name=m["name"]) for m in modes]
+
+        gtfs = await self._get_gtfs_hierarchy()
+        if gtfs and gtfs.modes:
+            return gtfs.modes
 
         data = await self._api_request("rolling_stocks.json")
         stocks = data.get("rollingStocks", [])
@@ -359,11 +812,7 @@ class TisseoApiClient:
         ]
 
     async def get_lines(self, mode_id: str | None = None) -> list[Line]:
-        """Get lines, optionally filtered by transport mode.
-
-        Uses displayTerminus=1 to include terminus stop areas for each line,
-        and filters client-side by transportMode.id.
-        """
+        """Get lines, optionally filtered by transport mode (GTFS first)."""
         if self._use_mock:
             from .mock_data import get_lines_by_mode, MOCK_LINES
             if mode_id:
@@ -381,6 +830,19 @@ class TisseoApiClient:
                 )
                 for line in lines_raw
             ]
+
+        gtfs = await self._get_gtfs_hierarchy()
+        if gtfs:
+            if mode_id:
+                gtfs_lines = gtfs.lines_by_mode.get(mode_id, [])
+            else:
+                gtfs_lines = [
+                    line
+                    for lines in gtfs.lines_by_mode.values()
+                    for line in lines
+                ]
+            if gtfs_lines:
+                return gtfs_lines
 
         # Real API: fetch all lines with terminus info
         params = {"displayTerminus": "1"}
@@ -435,12 +897,7 @@ class TisseoApiClient:
         return result
 
     async def get_routes(self, line_id: str) -> list[Route]:
-        """Get directions for a line using terminus stop areas.
-
-        The Tisseo API represents directions as terminus[] on each line.
-        Each terminus is a stop_area that the line ends at.
-        For example, Tram L6 has terminus "Ramonville" and "Castanet-Tolosan".
-        """
+        """Get directions for a line, preferring GTFS trip headsigns."""
         if self._use_mock:
             from .mock_data import get_routes_for_line
             routes = get_routes_for_line(line_id)
@@ -452,6 +909,12 @@ class TisseoApiClient:
                 )
                 for r in routes
             ]
+
+        gtfs = await self._get_gtfs_hierarchy()
+        if gtfs:
+            gtfs_routes = gtfs.routes_by_line.get(line_id, [])
+            if gtfs_routes:
+                return gtfs_routes
 
         # Real API: fetch line with terminus info
         params = {"lineId": line_id, "displayTerminus": "1"}
@@ -491,22 +954,17 @@ class TisseoApiClient:
         return routes
 
     async def get_stops(self, line_id: str, route_id: str) -> list[Stop]:
-        """Get stops for a specific line filtered by direction.
-
-        Uses stop_points.json with displayDestinations=1.
-        Each physicalStop has a destinations[] listing the terminus stop_areas
-        reachable from that specific stop pole. We filter to keep only the
-        stop points whose destinations include the selected terminus (route_id).
-
-        This gives exactly the stops on the correct side of the road for the
-        chosen direction, with no duplicates.
-
-        route_id is a terminus stop_area ID (e.g. "stop_area:SA_206").
-        """
+        """Get stops for a specific line and direction, preferring GTFS."""
         if self._use_mock:
             from .mock_data import get_stops_for_route
             stops = get_stops_for_route(line_id, route_id)
         else:
+            gtfs = await self._get_gtfs_hierarchy()
+            if gtfs:
+                gtfs_stops = gtfs.stops_by_line_route.get((line_id, route_id), [])
+                if gtfs_stops:
+                    return gtfs_stops
+
             # Real API: fetch physical stops with destination info
             params = {"lineId": line_id, "displayDestinations": "1"}
             data = await self._api_request("stop_points.json", params)
@@ -688,6 +1146,13 @@ class TisseoApiClient:
 
     async def get_stop_info(self, stop_id: str) -> StopInfo | None:
         """Get information about a stop."""
+        if not self._use_mock:
+            gtfs = await self._get_gtfs_hierarchy()
+            if gtfs:
+                info = gtfs.stop_info_by_id.get(stop_id)
+                if info is not None:
+                    return info
+
         if stop_id.startswith("stop_point:"):
             params = {"stopPointId": stop_id, "number": 1}
         else:
@@ -1010,7 +1475,13 @@ class TisseoApiClient:
         return results
 
     async def _get_lines_for_stop(self, stop_id: str) -> list[dict]:
-        """Get lines serving a specific stop (for real API)."""
+        """Get lines serving a specific stop (GTFS first, API fallback)."""
+        gtfs = await self._get_gtfs_hierarchy()
+        if gtfs:
+            gtfs_lines = gtfs.lines_by_stop_area.get(stop_id, [])
+            if gtfs_lines:
+                return gtfs_lines
+
         try:
             params = {"stopAreaId": stop_id}
             data = await self._api_request("lines.json", params)

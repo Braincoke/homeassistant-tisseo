@@ -23,6 +23,7 @@ Les donnees de transport Tisseo/Toulouse Metropole reutilisees par cette integra
 ## Fonctionnalités
 
 - **Assistant de configuration guidé** - Sélectionnez mode de transport, ligne, direction et arrêt via un parcours étape par étape. Pas besoin de connaître les identifiants d'arrêt ni les paramètres API.
+- **Référentiel basé GTFS** - Les modes, lignes, directions, arrêts et couleurs de ligne sont chargés depuis le flux GTFS hebdomadaire officiel quand il est disponible, ce qui réduit l'usage de l'API temps réel.
 - **Trois stratégies de mise à jour** - Choisissez entre mises à jour régulières, stratégie intelligente basée sur les départs, ou fenêtres horaires.
 - **Stratégie par fenêtres horaires (recommandée)** - Utilise la logique intelligente pendant les périodes où vous consultez réellement les départs (par exemple matin/soir) et ralentit ou coupe les appels hors fenêtre pour réduire l'usage API.
 - **Départs en temps réel** - Affiche les prochains départs avec indicateur temps réel vs théorique.
@@ -230,6 +231,7 @@ logger:
 ## Référence API Tisseo
 
 Voir [TISSEO_API_REFERENCE.md](TISSEO_API_REFERENCE.md) pour la documentation API détaillée, les endpoints et les structures de réponse.
+Voir [GTFS_USAGE.md](GTFS_USAGE.md) pour la couverture GTFS, les règles de fallback et ce qui utilise encore l'API temps réel.
 Pour la planification sur fenêtre future (exemple : demain 07:40-08:15 récupéré à 20:00), voir [PLANNED_WINDOW_DEPARTURES.md](PLANNED_WINDOW_DEPARTURES.md).
 
 ## Cartes compagnon

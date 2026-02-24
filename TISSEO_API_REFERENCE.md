@@ -38,6 +38,32 @@ This section documents the exact API sequence used to drive the UI flow:
 3. Select the direction (terminus) for that line.
 4. Display real-time departures for the selected line/direction.
 
+## Current Implementation (GTFS-First)
+
+As of the current implementation, the selector hierarchy is **GTFS-first**:
+
+1. Modes from GTFS (`routes.route_type` + line-name mapping for Linéo).
+2. Lines from GTFS `routes.txt`.
+3. Directions from GTFS `trips.txt` (`direction_id` + `trip_headsign`).
+4. Stops from GTFS `stop_times.txt` + `stops.txt`.
+5. Departures still from realtime API (`stops_schedules.json`).
+
+If GTFS is temporarily unavailable, the integration falls back to the API-based selectors.
+
+```mermaid
+flowchart TD
+  A["Step 1: Select Mode"] --> B["Load GTFS (routes.txt)"]
+  B --> C["Build mode list from route_type + line short name"]
+  C --> D["Step 2: Select Line"]
+  D --> E["Load lines from GTFS routes.txt (with route_color/route_text_color)"]
+  E --> F["Step 3: Select Direction"]
+  F --> G["Load directions from GTFS trips.txt (trip_headsign by direction_id)"]
+  G --> H["Step 4: Select Stop"]
+  H --> I["Load ordered stops from stop_times.txt + stops.txt"]
+  I --> J["Step 5: Show Departures"]
+  J --> K["Call stops_schedules.json (realtime/theoretical departures)"]
+```
+
 **Flowchart**
 
 ```mermaid
@@ -205,6 +231,17 @@ https://api.tisseo.fr/v2/stops_schedules.json?stopAreaId=stop_area:SA_444&lineId
 
 ## Endpoints Used by This Integration
 
+### `tisseo-gtfs` (Open Data GTFS ZIP) - Static referential hierarchy
+
+Used first in: `api.py:get_transport_modes()`, `api.py:get_lines()`, `api.py:get_routes()`, `api.py:get_stops()`, `api.py:get_stop_info()`
+
+Files used:
+
+- `routes.txt` (lines + colors + route_type)
+- `trips.txt` (direction_id + headsign)
+- `stop_times.txt` (ordered stops per direction)
+- `stops.txt` (stop names and parent stations)
+
 ### `stops_schedules.json` - Real-time departures
 
 Used in: `api.py:get_departures()`, `api.py:get_stop_info()`
@@ -224,7 +261,7 @@ Used in: `api.py:get_departures()`, `api.py:get_stop_info()`
 
 ### `lines.json` - Lines and transport modes
 
-Used in: `api.py:get_transport_modes()`, `api.py:get_lines()`, `api.py:get_routes()`
+Used in: fallback for `api.py:get_lines()`, fallback for `api.py:get_routes()`, `api.py:get_outages()`, `api.py:_get_lines_for_stop()`
 
 | Parameter | Description |
 |---|---|
@@ -240,7 +277,7 @@ Used in: `api.py:get_transport_modes()`, `api.py:get_lines()`, `api.py:get_route
 
 ### `stop_points.json` - Physical stops
 
-Used in: `api.py:get_stops()`
+Used in: fallback for `api.py:get_stops()`
 
 | Parameter | Description |
 |---|---|
