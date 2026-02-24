@@ -1386,6 +1386,7 @@ class TisseoApiClient:
         query_datetime: datetime | None = None,
         query_end_datetime: datetime | None = None,
         display_realtime: bool | None = None,
+        allow_api_fallback: bool = True,
     ) -> list[Departure]:
         """Get upcoming departures for a stop, optionally filtered by line/route."""
         if query_datetime is not None and not self._use_mock:
@@ -1432,6 +1433,8 @@ class TisseoApiClient:
                 line_id,
                 route_id,
             )
+            if not allow_api_fallback:
+                return []
 
         if stop_id.startswith("stop_point:"):
             params = {"stopPointId": stop_id, "number": number}

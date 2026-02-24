@@ -406,15 +406,37 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
 
     async def async_refresh_departures_only(self) -> None:
-        """Refresh only departures (one API call) for manual button usage."""
+        """Refresh departures immediately for manual button usage."""
         try:
-            self.departures = await self._client.get_departures(
-                stop_id=self.stop_id,
-                line_id=self.line_id,
-                route_id=self.route_id,
-                number=10,
+            now = datetime.now(TOULOUSE_TZ)
+            use_gtfs_off_window = (
+                self._schedule_enabled
+                and self._update_strategy == UPDATE_STRATEGY_TIME_WINDOW
+                and not self.is_in_active_window()
             )
-            self._last_api_fetch = datetime.now(TOULOUSE_TZ)
+
+            if use_gtfs_off_window:
+                # Keep manual refresh behavior consistent with scheduled refresh:
+                # outside active windows in time-window mode, rely on GTFS.
+                self.departures = await self._client.get_departures(
+                    stop_id=self.stop_id,
+                    line_id=self.line_id,
+                    route_id=self.route_id,
+                    number=10,
+                    query_datetime=now,
+                    query_end_datetime=now + timedelta(days=1),
+                    display_realtime=False,
+                    allow_api_fallback=False,
+                )
+            else:
+                self.departures = await self._client.get_departures(
+                    stop_id=self.stop_id,
+                    line_id=self.line_id,
+                    route_id=self.route_id,
+                    number=10,
+                )
+
+            self._last_api_fetch = now
             self._clear_failure_state_if_recovered()
 
             self.async_set_updated_data(
@@ -527,12 +549,63 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from Tisseo API."""
         try:
+            use_gtfs_off_window = (
+                self._schedule_enabled
+                and self._update_strategy == UPDATE_STRATEGY_TIME_WINDOW
+                and not self.is_in_active_window()
+            )
+
             # Get stop info if we don't have it yet
             if self.stop_info is None:
                 self.stop_info = await self._client.get_stop_info(self.stop_id)
                 _LOGGER.debug("Got stop info: %s", self.stop_info)
 
-            # Get departures (filtered by line/route if specified)
+            if use_gtfs_off_window:
+                now = datetime.now(TOULOUSE_TZ)
+                # Off-window in time-window mode: keep sensors updated from cached GTFS
+                # without consuming realtime API calls.
+                self.departures = await self._client.get_departures(
+                    stop_id=self.stop_id,
+                    line_id=self.line_id,
+                    route_id=self.route_id,
+                    number=10,
+                    query_datetime=now,
+                    query_end_datetime=now + timedelta(days=1),
+                    display_realtime=False,
+                    allow_api_fallback=False,
+                )
+                if self.departures:
+                    if not self.line_color:
+                        self.line_color = self.departures[0].line_color
+                    if not self.line_text_color:
+                        self.line_text_color = self.departures[0].line_text_color
+
+                self.alerts = self._cached_alerts
+                self.outages = self._cached_outages
+                self._last_api_fetch = now
+
+                _LOGGER.debug(
+                    "Using GTFS off-window departures for %s (%d departures)",
+                    self.stop_name,
+                    len(self.departures),
+                )
+
+                self._clear_failure_state_if_recovered()
+
+                return {
+                    "stop_info": self.stop_info,
+                    "departures": self.departures,
+                    "next_departure": self.departures[0] if self.departures else None,
+                    "alerts": self.alerts,
+                    "new_alerts": self._new_alerts,
+                    "outages": self.outages,
+                    "planned_window": self._planned_window_result,
+                    "last_api_fetch": self._last_api_fetch,
+                    "last_alert_fetch": self._last_alert_fetch,
+                    "last_outage_fetch": self._last_outage_fetch,
+                }
+
+            # Active window / non-window strategies: use realtime API.
             self.departures = await self._client.get_departures(
                 stop_id=self.stop_id,
                 line_id=self.line_id,

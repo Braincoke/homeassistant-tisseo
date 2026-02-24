@@ -21,7 +21,7 @@ Transit data reused by this integration comes from Tisseo/Toulouse Metropole Ope
 - **Guided setup wizard** - Select your transport mode, line, direction, and stop through a step-by-step config flow. No need to know stop IDs or API parameters.
 - **GTFS-backed referential data** - Transport modes, lines, directions, stop lists, and line colors are loaded from the official weekly GTFS feed when available, reducing realtime API usage.
 - **Three update strategies** - Choose between regular polling, smart departure-based scheduling, or time-window scheduling.
-- **Time-window strategy (recommended)** - Uses smart updates during the periods you actually check departures (for example morning/evening commute) and slower or no updates outside those windows to reduce API usage.
+- **Time-window strategy (recommended)** - Uses realtime smart updates during your active periods (for example morning/evening commute), then switches to GTFS-based cached departures outside those windows to minimize realtime API usage.
 - **Real-time departures** - Shows next departures with real-time vs scheduled indicators.
 - **Service alerts** - Monitors active Tisseo service alerts for your line, with new-alert detection for notification automations.
 - **Official line colors** - Reads `bgXmlColor` and `fgXmlColor` from the Tisseo API, so every line renders with its official branding colors in the companion cards.
@@ -97,7 +97,7 @@ Each configured stop creates a device with the following entities:
 
 | Entity | Description |
 |--------|-------------|
-| **Refresh departures** | Press to trigger an immediate departure-only refresh (single departures API call). Service alerts/outages keep their normal cached refresh cadence. |
+| **Refresh departures** | Press to trigger an immediate departures refresh. In time-window mode outside active windows, this uses GTFS planned data (no realtime API fallback). Otherwise it uses one realtime departures API call. Service alerts/outages keep their normal cached refresh cadence. |
 
 ## Update Strategies
 
@@ -106,8 +106,9 @@ Each configured stop creates a device with the following entities:
 Best balance for most users and best way to reduce API usage.
 
 How it works:
-- During configured active windows, it uses **smart** scheduling.
-- Outside active windows, it uses the configured **off-window interval**.
+- During configured active windows, it uses **smart** scheduling with realtime API departures.
+- Outside active windows, it keeps refreshing at the configured **off-window interval** but serves departures from **GTFS cached data**.
+- Outside active windows, realtime departures API fallback is disabled for departures.
 - Set off-window interval to `0` to disable updates outside windows.
 
 Typical use case:

@@ -41,13 +41,16 @@ Code: `api.py`
 
 These remain API-based by design:
 
-- `get_departures()` -> `stops_schedules.json` for realtime requests and default polling
+- `get_departures()` -> `stops_schedules.json` for realtime requests (smart mode, regular mode, and active windows in time-window mode)
 - `get_messages()` -> `messages.json` (service messages)
 - `get_outages()` -> `lines.json?displayOutages=1` (equipment outages)
 - `get_nearby_stops()` -> `places.json` for geospatial search (line enrichment now uses GTFS when possible)
 
 For planned windows (`query_datetime` + `query_end_datetime`) with `display_realtime=false`,
 the integration now uses GTFS first and falls back to `stops_schedules.json` only when GTFS matching is not possible.
+
+For **time-window strategy outside active windows**, departures are sourced from GTFS planned data
+with realtime API fallback disabled for departures. Refresh cadence still follows `inactive_interval`.
 
 ## Discrepancies and fallback strategy
 

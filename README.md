@@ -25,7 +25,7 @@ Les donnees de transport Tisseo/Toulouse Metropole reutilisees par cette integra
 - **Assistant de configuration guidé** - Sélectionnez mode de transport, ligne, direction et arrêt via un parcours étape par étape. Pas besoin de connaître les identifiants d'arrêt ni les paramètres API.
 - **Référentiel basé GTFS** - Les modes, lignes, directions, arrêts et couleurs de ligne sont chargés depuis le flux GTFS hebdomadaire officiel quand il est disponible, ce qui réduit l'usage de l'API temps réel.
 - **Trois stratégies de mise à jour** - Choisissez entre mises à jour régulières, stratégie intelligente basée sur les départs, ou fenêtres horaires.
-- **Stratégie par fenêtres horaires (recommandée)** - Utilise la logique intelligente pendant les périodes où vous consultez réellement les départs (par exemple matin/soir) et ralentit ou coupe les appels hors fenêtre pour réduire l'usage API.
+- **Stratégie par fenêtres horaires (recommandée)** - Utilise la logique intelligente temps réel pendant les périodes utiles (par exemple matin/soir), puis bascule sur des départs basés GTFS hors fenêtre pour réduire l'usage de l'API temps réel.
 - **Départs en temps réel** - Affiche les prochains départs avec indicateur temps réel vs théorique.
 - **Alertes de service** - Surveille les alertes actives Tisseo pour votre ligne, avec détection des nouvelles alertes pour les automatisations de notification.
 - **Couleurs officielles des lignes** - Lit `bgXmlColor` et `fgXmlColor` depuis l'API Tisseo pour afficher chaque ligne avec ses couleurs officielles dans les cartes compagnon.
@@ -106,7 +106,7 @@ Chaque arrêt configuré crée un device avec les entités suivantes :
 
 | Entité | Description |
 |--------|-------------|
-| **Refresh departures** | Appuyez pour déclencher un rafraîchissement immédiat des départs uniquement (un seul appel API départs). Les alertes/messages conservent leur cadence de rafraîchissement habituelle. |
+| **Refresh departures** | Appuyez pour déclencher un rafraîchissement immédiat des départs. En stratégie fenêtres horaires hors fenêtre active, ce bouton utilise GTFS (sans fallback API temps réel). Sinon, il fait un appel API temps réel départs. Les alertes/messages conservent leur cadence habituelle. |
 
 ## Stratégies de mise à jour
 
@@ -115,8 +115,9 @@ Chaque arrêt configuré crée un device avec les entités suivantes :
 C'est le meilleur compromis pour la majorité des utilisateurs et la meilleure façon de limiter l'usage API.
 
 Fonctionnement :
-- Pendant les fenêtres actives configurées, l'intégration utilise la logique **smart**.
-- Hors fenêtres, elle utilise l'**intervalle hors fenêtre** configuré.
+- Pendant les fenêtres actives configurées, l'intégration utilise la logique **smart** avec l'API temps réel.
+- Hors fenêtres, elle utilise l'**intervalle hors fenêtre** configuré mais sert les départs depuis le **cache GTFS**.
+- Hors fenêtres, le fallback vers l'API temps réel est désactivé pour les départs.
 - Mettez l'intervalle hors fenêtre à `0` pour désactiver toute mise à jour hors fenêtre.
 
 Cas d'usage typique :

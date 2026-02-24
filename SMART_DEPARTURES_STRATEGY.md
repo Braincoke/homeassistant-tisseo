@@ -56,7 +56,8 @@ So one refresh can be:
 - 2 to 4 calls depending on first-run state and endpoint-specific refresh intervals.
 
 The manual button entity **Refresh departures** is different:
-- It calls departures only (`stops_schedules.json`) once.
+- In regular/smart modes (or active time windows), it calls departures only (`stops_schedules.json`) once.
+- In time-window mode outside active windows, it refreshes departures from GTFS planned data (no realtime API fallback).
 - It does not force messages/outages refresh.
 
 ## Why You Might See No API Logs
@@ -66,7 +67,7 @@ If you expected request logs but see none, check:
 1. `Debug mode` must be enabled in Tisseo options.
 2. Home Assistant logger level must include `custom_components.tisseo: debug`.
 3. Smart mode can intentionally wait a long time if next departure is far away (it refreshes at `T-60s`).
-4. In time-window strategy, if you are outside windows and off-window interval is `0`, no polling is expected.
+4. In time-window strategy, outside active windows uses GTFS-based departures; if off-window interval is `0`, no polling is expected.
 
 ## How To Validate Smart Mode Is Working
 
