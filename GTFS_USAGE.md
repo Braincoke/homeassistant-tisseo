@@ -51,6 +51,8 @@ the integration now uses GTFS first and falls back to `stops_schedules.json` onl
 
 For **time-window strategy outside active windows**, departures are sourced from GTFS planned data
 with realtime API fallback disabled for departures. Refresh cadence still follows `inactive_interval`.
+If GTFS is temporarily unavailable in that period, departures can be empty until GTFS is available again
+or until the next active window (where realtime API calls resume).
 
 ## Discrepancies and fallback strategy
 
