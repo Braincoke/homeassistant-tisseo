@@ -246,6 +246,8 @@ Files used:
 
 Used in: `api.py:get_departures()`, `api.py:get_stop_info()`
 
+Note: for planned window queries with `display_realtime=0`, the integration attempts GTFS-first and falls back to this endpoint when needed.
+
 | Parameter | Description |
 |---|---|
 | `stopPointId` | Physical stop ID (e.g., `stop_point:SP_1234`) |

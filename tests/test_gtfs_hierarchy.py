@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
 import zipfile
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from custom_components.tisseo.api import TisseoApiClient
+
+TOULOUSE_TZ = ZoneInfo("Europe/Paris")
 
 
 def _csv_bytes(headers: list[str], rows: list[list[str]]) -> str:
@@ -160,3 +165,30 @@ def test_parse_gtfs_hierarchy_routes_and_stops() -> None:
     assert parsed.stop_info_by_id["stop_point:SP_1"].name == "Mermoz"
     lines_at_area = parsed.lines_by_stop_area["stop_area:SA_1"]
     assert any(item["line_short_name"] == "A" for item in lines_at_area)
+
+
+def test_planned_departures_uses_gtfs_window() -> None:
+    """Planned windows should be resolvable from GTFS without realtime API."""
+    client = TisseoApiClient(api_key=None, use_mock=False)
+    parsed = client._parse_gtfs_hierarchy(_build_minimal_gtfs_zip())
+    client._gtfs_cache = parsed
+
+    start = datetime(2026, 2, 24, 6, 50, tzinfo=TOULOUSE_TZ)
+    end = datetime(2026, 2, 24, 7, 10, tzinfo=TOULOUSE_TZ)
+
+    departures = asyncio.run(
+        client._get_departures_from_gtfs(
+            stop_id="stop_area:SA_1",
+            line_id="line:61",
+            route_id="stop_area:SA_1",
+            number=20,
+            start_datetime=start,
+            end_datetime=end,
+        )
+    )
+
+    assert departures is not None
+    assert len(departures) == 1
+    assert departures[0].line_short_name == "A"
+    assert departures[0].destination == "Basso Cambo"
+    assert departures[0].is_realtime is False

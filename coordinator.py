@@ -460,6 +460,7 @@ class TisseoStopCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 route_id=self.route_id,
                 number=number,
                 query_datetime=start_datetime,
+                query_end_datetime=end_datetime,
                 display_realtime=display_realtime,
             )
 

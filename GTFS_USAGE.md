@@ -41,10 +41,13 @@ Code: `api.py`
 
 These remain API-based by design:
 
-- `get_departures()` -> `stops_schedules.json` (realtime/theoretical departures)
+- `get_departures()` -> `stops_schedules.json` for realtime requests and default polling
 - `get_messages()` -> `messages.json` (service messages)
 - `get_outages()` -> `lines.json?displayOutages=1` (equipment outages)
 - `get_nearby_stops()` -> `places.json` for geospatial search (line enrichment now uses GTFS when possible)
+
+For planned windows (`query_datetime` + `query_end_datetime`) with `display_realtime=false`,
+the integration now uses GTFS first and falls back to `stops_schedules.json` only when GTFS matching is not possible.
 
 ## Discrepancies and fallback strategy
 
@@ -81,3 +84,9 @@ The **Tisseo API Usage** device now exposes separate counters:
 - GTFS counters: `GTFS calls *`
 
 This allows you to distinguish `api.tisseo.fr` usage from GTFS Open Data fetches.
+
+In addition, integration diagnostics now include:
+
+- `usage_diagnostics.realtime_api_usage`
+- `usage_diagnostics.gtfs_usage`
+- `gtfs_cache_diagnostics`

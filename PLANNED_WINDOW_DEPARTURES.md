@@ -2,6 +2,11 @@
 
 Use this when you want a list of departures for a **future** window (example: tomorrow between `07:40` and `08:15`) and fetch it the day before (example: `20:00`).
 
+Current integration behavior:
+
+- If `display_realtime=false`, planned-window lookups are GTFS-first with API fallback.
+- If `display_realtime=true`, realtime API is used.
+
 ## API Endpoint
 
 Use `stops_schedules`:

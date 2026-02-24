@@ -33,6 +33,49 @@ from .const import (
 TO_REDACT = {CONF_API_KEY}
 
 
+def _build_usage_diagnostics(usage_tracker: Any) -> dict[str, Any] | None:
+    """Build split usage diagnostics (realtime API vs GTFS)."""
+    if usage_tracker is None:
+        return None
+
+    metrics = usage_tracker.as_dict()
+    return {
+        "realtime_api_usage": {
+            "total_calls": metrics.get("total_calls"),
+            "successful_calls": metrics.get("successful_calls"),
+            "failed_calls": metrics.get("failed_calls"),
+            "today_calls": metrics.get("today_calls"),
+            "last_call_at": metrics.get("last_call_at"),
+            "last_success_at": metrics.get("last_success_at"),
+            "daily_counts_30d": metrics.get("daily_counts"),
+            "endpoint_counts_top": metrics.get("endpoint_counts"),
+        },
+        "gtfs_usage": {
+            "total_calls": metrics.get("gtfs_total_calls"),
+            "successful_calls": metrics.get("gtfs_successful_calls"),
+            "failed_calls": metrics.get("gtfs_failed_calls"),
+            "today_calls": metrics.get("gtfs_today_calls"),
+            "last_call_at": metrics.get("gtfs_last_call_at"),
+            "last_success_at": metrics.get("gtfs_last_success_at"),
+            "daily_counts_30d": metrics.get("gtfs_daily_counts"),
+            "endpoint_counts_top": metrics.get("gtfs_endpoint_counts"),
+        },
+    }
+
+
+def _build_gtfs_cache_diagnostics(hass: HomeAssistant) -> dict[str, Any] | None:
+    """Build GTFS cache diagnostics from the shared client."""
+    hub_data = hass.data.get(DOMAIN)
+    if hub_data is None:
+        return None
+
+    client = getattr(hub_data, "client", None)
+    if client is None or not hasattr(client, "get_gtfs_diagnostics"):
+        return None
+
+    return client.get_gtfs_diagnostics()
+
+
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -41,9 +84,13 @@ async def async_get_config_entry_diagnostics(
     # Redact sensitive data from config
     config_data = async_redact_data(dict(entry.data), TO_REDACT)
     coordinator = entry.runtime_data.coordinator
+    hub_data = hass.data.get(DOMAIN)
+    usage_tracker = getattr(hub_data, "usage_tracker", None)
+    usage_metrics = usage_tracker.as_dict() if usage_tracker else None
+    usage_diagnostics = _build_usage_diagnostics(usage_tracker)
+    gtfs_cache_diagnostics = _build_gtfs_cache_diagnostics(hass)
 
     if coordinator is None:
-        usage_tracker = hass.data.get(DOMAIN).usage_tracker if hass.data.get(DOMAIN) else None
         return {
             "config_entry": config_data,
             "entry_type": "hub",
@@ -77,7 +124,9 @@ async def async_get_config_entry_diagnostics(
                     entry.data.get(CONF_ACTIVE_WINDOWS),
                 ),
             },
-            "usage_metrics": usage_tracker.as_dict() if usage_tracker else None,
+            "usage_metrics": usage_metrics,
+            "usage_diagnostics": usage_diagnostics,
+            "gtfs_cache_diagnostics": gtfs_cache_diagnostics,
         }
 
     # Build departure info (safe to expose)
@@ -162,4 +211,6 @@ async def async_get_config_entry_diagnostics(
         "departures": departures_info,
         "alerts": alerts_info,
         "outages": outages_info,
+        "usage_diagnostics": usage_diagnostics,
+        "gtfs_cache_diagnostics": gtfs_cache_diagnostics,
     }

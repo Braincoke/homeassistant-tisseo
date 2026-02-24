@@ -9,7 +9,7 @@ import re
 import zipfile
 from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
@@ -202,12 +202,16 @@ class _GtfsHierarchyCache:
     """Cached GTFS hierarchy for selector steps (modes/lines/routes/stops)."""
 
     fetched_at: datetime
+    archive_bytes: bytes
     modes: list[TransportMode]
     lines_by_mode: dict[str, list[Line]]
+    line_by_id: dict[str, Line]
     routes_by_line: dict[str, list[Route]]
     stops_by_line_route: dict[tuple[str, str], list[Stop]]
     stop_info_by_id: dict[str, StopInfo]
     lines_by_stop_area: dict[str, list[dict[str, str]]]
+    direction_id_by_line_route: dict[tuple[str, str], str]
+    stop_points_by_area: dict[str, set[str]]
 
 
 class TisseoApiClient:
@@ -623,6 +627,15 @@ class TisseoApiClient:
                 "location_type": stop.get("location_type", "").strip() or "0",
             }
 
+        stop_points_by_area: dict[str, set[str]] = defaultdict(set)
+        for stop_id, stop_meta in stops_by_id.items():
+            parent_station = stop_meta.get("parent_station", "")
+            location_type = stop_meta.get("location_type", "0")
+            if location_type == "0" and parent_station:
+                stop_points_by_area[parent_station].add(stop_id)
+            elif location_type == "1":
+                stop_points_by_area.setdefault(stop_id, set())
+
         lines_by_mode: dict[str, list[Line]] = defaultdict(list)
         line_by_id: dict[str, Line] = {}
         for route in routes_rows:
@@ -661,6 +674,7 @@ class TisseoApiClient:
 
         routes_by_line: dict[str, list[Route]] = defaultdict(list)
         stops_by_line_route: dict[tuple[str, str], list[Stop]] = {}
+        direction_id_by_line_route: dict[tuple[str, str], str] = {}
 
         used_route_ids_by_line: dict[str, set[str]] = defaultdict(set)
         for (line_id, direction_id), trip_id in selected_trip_by_direction.items():
@@ -688,6 +702,7 @@ class TisseoApiClient:
                 direction=headsign,
             )
             routes_by_line[line_id].append(route)
+            direction_id_by_line_route[(line_id, route_id)] = direction_id
 
             seen_names: set[str] = set()
             route_stops: list[Stop] = []
@@ -779,12 +794,16 @@ class TisseoApiClient:
 
         return _GtfsHierarchyCache(
             fetched_at=datetime.now(UTC),
+            archive_bytes=archive_bytes,
             modes=modes,
             lines_by_mode=dict(lines_by_mode),
+            line_by_id=line_by_id,
             routes_by_line=dict(routes_by_line),
             stops_by_line_route=stops_by_line_route,
             stop_info_by_id=stop_info_by_id,
             lines_by_stop_area=lines_by_stop_area,
+            direction_id_by_line_route=direction_id_by_line_route,
+            stop_points_by_area=dict(stop_points_by_area),
         )
 
     async def _get_gtfs_hierarchy(self) -> _GtfsHierarchyCache | None:
@@ -1099,6 +1118,265 @@ class TisseoApiClient:
 
     # ========== Departure methods ==========
 
+    @staticmethod
+    def _parse_gtfs_time_to_seconds(value: str) -> int | None:
+        """Parse GTFS HH:MM[:SS] into seconds (supports hours >= 24)."""
+        parts = value.strip().split(":")
+        if len(parts) < 2:
+            return None
+        try:
+            hours = int(parts[0])
+            minutes = int(parts[1])
+            seconds = int(parts[2]) if len(parts) > 2 else 0
+        except ValueError:
+            return None
+        if minutes < 0 or minutes > 59 or seconds < 0 or seconds > 59 or hours < 0:
+            return None
+        return hours * 3600 + minutes * 60 + seconds
+
+    @staticmethod
+    def _iter_dates(start_date: date, end_date: date) -> list[date]:
+        """Build an inclusive date range list."""
+        if end_date < start_date:
+            return []
+        days: list[date] = []
+        current = start_date
+        while current <= end_date:
+            days.append(current)
+            current += timedelta(days=1)
+        return days
+
+    @staticmethod
+    def _parse_yyyymmdd(value: str) -> date | None:
+        """Parse YYYYMMDD into date."""
+        if len(value) != 8 or not value.isdigit():
+            return None
+        try:
+            return date(int(value[0:4]), int(value[4:6]), int(value[6:8]))
+        except ValueError:
+            return None
+
+    def _is_service_active_on(
+        self,
+        service_id: str,
+        service_date: date,
+        calendar_by_service: dict[str, dict[str, str]],
+        added_dates: dict[str, set[date]],
+        removed_dates: dict[str, set[date]],
+    ) -> bool:
+        """Check whether a GTFS service_id is active on a given date."""
+        if service_date in added_dates.get(service_id, set()):
+            return True
+        if service_date in removed_dates.get(service_id, set()):
+            return False
+
+        calendar_row = calendar_by_service.get(service_id)
+        if calendar_row is None:
+            return False
+
+        start_date = self._parse_yyyymmdd(calendar_row.get("start_date", ""))
+        end_date = self._parse_yyyymmdd(calendar_row.get("end_date", ""))
+        if start_date is None or end_date is None:
+            return False
+        if not (start_date <= service_date <= end_date):
+            return False
+
+        weekday_keys = [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+        ]
+        weekday_key = weekday_keys[service_date.weekday()]
+        return calendar_row.get(weekday_key, "0") == "1"
+
+    def _get_gtfs_direction_id(
+        self,
+        cache: _GtfsHierarchyCache,
+        line_id: str | None,
+        route_id: str | None,
+    ) -> str | None:
+        """Resolve a GTFS direction_id for line+route, if available."""
+        if not line_id or not route_id:
+            return None
+
+        direction_id = cache.direction_id_by_line_route.get((line_id, route_id))
+        if direction_id:
+            return direction_id
+
+        if route_id.startswith(f"{GTFS_ROUTE_ID_PREFIX}:{line_id}:"):
+            return route_id.rsplit(":", 1)[-1]
+
+        return None
+
+    def _get_gtfs_stop_ids(
+        self,
+        cache: _GtfsHierarchyCache,
+        stop_id: str,
+    ) -> set[str]:
+        """Resolve stop_point IDs to query in stop_times for a selected stop."""
+        if stop_id.startswith("stop_area:"):
+            stop_ids = set(cache.stop_points_by_area.get(stop_id, set()))
+            if not stop_ids:
+                stop_ids.add(stop_id)
+            return stop_ids
+        return {stop_id}
+
+    async def _get_departures_from_gtfs(
+        self,
+        stop_id: str,
+        line_id: str | None,
+        route_id: str | None,
+        number: int,
+        start_datetime: datetime,
+        end_datetime: datetime,
+    ) -> list[Departure] | None:
+        """Get planned departures from GTFS static feed for a future window."""
+        cache = await self._get_gtfs_hierarchy()
+        if cache is None:
+            return None
+        if line_id is None:
+            return None
+
+        line = cache.line_by_id.get(line_id)
+        if line is None:
+            return None
+
+        direction_id: str | None = None
+        if route_id:
+            direction_id = self._get_gtfs_direction_id(cache, line_id, route_id)
+            if direction_id is None:
+                # Route mismatch between legacy API IDs and GTFS mapping: fallback to API.
+                return None
+
+        query_stop_ids = self._get_gtfs_stop_ids(cache, stop_id)
+
+        try:
+            with zipfile.ZipFile(io.BytesIO(cache.archive_bytes)) as archive:
+                trips_rows = self._read_gtfs_csv(archive, "trips.txt")
+                calendar_rows = self._read_gtfs_csv(archive, "calendar.txt")
+                calendar_dates_rows = self._read_gtfs_csv(archive, "calendar_dates.txt")
+        except Exception as err:
+            _LOGGER.warning("Failed to parse GTFS archive for planned departures: %s", err)
+            return None
+
+        service_dates = self._iter_dates(
+            start_datetime.date() - timedelta(days=1),
+            end_datetime.date(),
+        )
+
+        calendar_by_service = {
+            row.get("service_id", "").strip(): row
+            for row in calendar_rows
+            if row.get("service_id", "").strip()
+        }
+        added_dates: dict[str, set[date]] = defaultdict(set)
+        removed_dates: dict[str, set[date]] = defaultdict(set)
+        for row in calendar_dates_rows:
+            service_id = row.get("service_id", "").strip()
+            exception_date = self._parse_yyyymmdd(row.get("date", "").strip())
+            if not service_id or exception_date is None:
+                continue
+            exception_type = row.get("exception_type", "").strip()
+            if exception_type == "1":
+                added_dates[service_id].add(exception_date)
+            elif exception_type == "2":
+                removed_dates[service_id].add(exception_date)
+
+        trip_meta: dict[str, tuple[str, list[date]]] = {}
+        for trip in trips_rows:
+            trip_line_id = trip.get("route_id", "").strip()
+            trip_id = trip.get("trip_id", "").strip()
+            service_id = trip.get("service_id", "").strip()
+            if not trip_id or not service_id:
+                continue
+            if trip_line_id != line_id:
+                continue
+
+            trip_direction = trip.get("direction_id", "").strip() or "0"
+            if direction_id is not None and trip_direction != direction_id:
+                continue
+
+            active_dates = [
+                service_date
+                for service_date in service_dates
+                if self._is_service_active_on(
+                    service_id,
+                    service_date,
+                    calendar_by_service,
+                    added_dates,
+                    removed_dates,
+                )
+            ]
+            if not active_dates:
+                continue
+
+            headsign = trip.get("trip_headsign", "").strip() or line.name
+            trip_meta[trip_id] = (headsign, active_dates)
+
+        if not trip_meta:
+            return []
+
+        planned_departures: list[Departure] = []
+        try:
+            with zipfile.ZipFile(io.BytesIO(cache.archive_bytes)) as archive:
+                with archive.open("stop_times.txt") as raw_file:
+                    reader = csv.DictReader(
+                        io.TextIOWrapper(raw_file, encoding="utf-8-sig")
+                    )
+                    for row in reader:
+                        trip_id = str(row.get("trip_id", "")).strip()
+                        if trip_id not in trip_meta:
+                            continue
+
+                        stop_time_stop_id = str(row.get("stop_id", "")).strip()
+                        if stop_time_stop_id not in query_stop_ids:
+                            continue
+
+                        dep_time_str = str(row.get("departure_time", "")).strip() or str(
+                            row.get("arrival_time", "")
+                        ).strip()
+                        dep_seconds = self._parse_gtfs_time_to_seconds(dep_time_str)
+                        if dep_seconds is None:
+                            continue
+
+                        destination, active_dates = trip_meta[trip_id]
+                        for service_date in active_dates:
+                            dep_dt = datetime.combine(
+                                service_date,
+                                datetime.min.time(),
+                                TOULOUSE_TZ,
+                            )
+                            dep_dt += timedelta(seconds=dep_seconds)
+                            if dep_dt < start_datetime or dep_dt > end_datetime:
+                                continue
+
+                            planned_departures.append(
+                                Departure(
+                                    line_short_name=line.short_name,
+                                    line_name=line.name,
+                                    line_color=line.color,
+                                    line_text_color=line.text_color,
+                                    destination=destination,
+                                    departure_time=dep_dt,
+                                    waiting_time="?",
+                                    is_realtime=False,
+                                    transport_mode=line.transport_mode or "Bus",
+                                )
+                            )
+        except Exception as err:
+            _LOGGER.warning(
+                "Failed to iterate GTFS stop_times for planned departures: %s",
+                err,
+            )
+            return None
+
+        planned_departures.sort(key=lambda dep: dep.departure_time)
+        return planned_departures[:number]
+
     async def get_departures(
         self,
         stop_id: str,
@@ -1106,9 +1384,55 @@ class TisseoApiClient:
         route_id: str | None = None,
         number: int = 10,
         query_datetime: datetime | None = None,
+        query_end_datetime: datetime | None = None,
         display_realtime: bool | None = None,
     ) -> list[Departure]:
         """Get upcoming departures for a stop, optionally filtered by line/route."""
+        if query_datetime is not None and not self._use_mock:
+            query_datetime = (
+                query_datetime.astimezone(TOULOUSE_TZ)
+                if query_datetime.tzinfo is not None
+                else query_datetime.replace(tzinfo=TOULOUSE_TZ)
+            )
+        if query_end_datetime is not None and not self._use_mock:
+            query_end_datetime = (
+                query_end_datetime.astimezone(TOULOUSE_TZ)
+                if query_end_datetime.tzinfo is not None
+                else query_end_datetime.replace(tzinfo=TOULOUSE_TZ)
+            )
+
+        if (
+            not self._use_mock
+            and query_datetime is not None
+            and query_end_datetime is not None
+            and display_realtime is False
+        ):
+            gtfs_departures = await self._get_departures_from_gtfs(
+                stop_id=stop_id,
+                line_id=line_id,
+                route_id=route_id,
+                number=number,
+                start_datetime=query_datetime,
+                end_datetime=query_end_datetime,
+            )
+            if gtfs_departures is not None:
+                _LOGGER.debug(
+                    "Using GTFS planned departures for stop=%s line=%s route=%s window=%s..%s count=%d",
+                    stop_id,
+                    line_id,
+                    route_id,
+                    query_datetime.isoformat(),
+                    query_end_datetime.isoformat(),
+                    len(gtfs_departures),
+                )
+                return gtfs_departures
+            _LOGGER.debug(
+                "GTFS planned departures unavailable for stop=%s line=%s route=%s; falling back to realtime API",
+                stop_id,
+                line_id,
+                route_id,
+            )
+
         if stop_id.startswith("stop_point:"):
             params = {"stopPointId": stop_id, "number": number}
         else:
@@ -1119,12 +1443,7 @@ class TisseoApiClient:
             params["lineId"] = line_id
 
         if query_datetime is not None and not self._use_mock:
-            local_dt = (
-                query_datetime.astimezone(TOULOUSE_TZ)
-                if query_datetime.tzinfo is not None
-                else query_datetime.replace(tzinfo=TOULOUSE_TZ)
-            )
-            params["datetime"] = local_dt.strftime("%Y-%m-%d %H:%M")
+            params["datetime"] = query_datetime.strftime("%Y-%m-%d %H:%M")
 
         if display_realtime is not None and not self._use_mock:
             params["displayRealTime"] = "1" if display_realtime else "0"
@@ -1591,6 +1910,44 @@ class TisseoApiClient:
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
         return R * c
+
+    def get_gtfs_diagnostics(self) -> dict[str, Any]:
+        """Return GTFS cache/network diagnostics."""
+        now = datetime.now(UTC)
+        cache = self._gtfs_cache
+
+        cache_fetched_at = cache.fetched_at.isoformat() if cache else None
+        cache_age_seconds = (
+            int((now - cache.fetched_at).total_seconds()) if cache else None
+        )
+
+        mode_count = len(cache.modes) if cache else 0
+        line_count = (
+            sum(len(lines) for lines in cache.lines_by_mode.values()) if cache else 0
+        )
+        route_count = (
+            sum(len(routes) for routes in cache.routes_by_line.values()) if cache else 0
+        )
+        stop_mapping_count = len(cache.stops_by_line_route) if cache else 0
+
+        return {
+            "enabled": not self._use_mock,
+            "cache_loaded": cache is not None,
+            "cache_fetched_at": cache_fetched_at,
+            "cache_age_seconds": cache_age_seconds,
+            "cache_ttl_seconds": GTFS_CACHE_TTL_SECONDS,
+            "failure_retry_seconds": GTFS_FAILURE_RETRY_SECONDS,
+            "last_failure_at": (
+                self._gtfs_last_failure_at.isoformat()
+                if self._gtfs_last_failure_at
+                else None
+            ),
+            "current_export_url": self._gtfs_export_url,
+            "mode_count": mode_count,
+            "line_count": line_count,
+            "route_count": route_count,
+            "stop_mapping_count": stop_mapping_count,
+        }
 
     async def close(self) -> None:
         """Close the API client session."""

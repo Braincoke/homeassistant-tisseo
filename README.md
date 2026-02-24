@@ -30,7 +30,7 @@ Les donnees de transport Tisseo/Toulouse Metropole reutilisees par cette integra
 - **Alertes de service** - Surveille les alertes actives Tisseo pour votre ligne, avec détection des nouvelles alertes pour les automatisations de notification.
 - **Couleurs officielles des lignes** - Lit `bgXmlColor` et `fgXmlColor` depuis l'API Tisseo pour afficher chaque ligne avec ses couleurs officielles dans les cartes compagnon.
 - **Bouton d'actualisation manuelle** - Chaque ligne inclut un bouton pour déclencher un rafraîchissement à la demande.
-- **Action départs planifiés** - Appelez un service intégré pour récupérer les départs sur une fenêtre future (par exemple demain matin), avec stockage optionnel du résultat sur un capteur dédié par arrêt.
+- **Action départs planifiés** - Appelez un service intégré pour récupérer les départs sur une fenêtre future (par exemple demain matin), avec GTFS prioritaire (fallback API), et stockage optionnel du résultat sur un capteur dédié par arrêt.
 - **Mode debug** - Option pour journaliser tous les appels API et réponses (anonymisés) avec le préfixe `[TISSEO]`.
 - **Traductions françaises et anglaises** - Traductions UI complètes dans les deux langues.
 

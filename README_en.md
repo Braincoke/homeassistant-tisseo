@@ -26,7 +26,7 @@ Transit data reused by this integration comes from Tisseo/Toulouse Metropole Ope
 - **Service alerts** - Monitors active Tisseo service alerts for your line, with new-alert detection for notification automations.
 - **Official line colors** - Reads `bgXmlColor` and `fgXmlColor` from the Tisseo API, so every line renders with its official branding colors in the companion cards.
 - **Manual refresh button** - Each stop device includes a button entity to trigger an on-demand data refresh.
-- **Planned departures action** - Call a built-in service to fetch departures for a future time window (for example tomorrow morning), optionally storing the result on a dedicated sensor per stop.
+- **Planned departures action** - Call a built-in service to fetch departures for a future time window (for example tomorrow morning), using GTFS first (with API fallback), and optionally storing the result on a dedicated sensor per stop.
 - **Debug mode** - Optional toggle to log all API calls and responses (sanitized) with the `[TISSEO]` prefix.
 - **French and English translations** - Full UI translations for both languages.
 
