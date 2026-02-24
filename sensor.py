@@ -655,6 +655,10 @@ class TisseoPlannedDeparturesSensor(TisseoBaseSensor):
         )
 
         return {
+            "stop_id": planned_window.get("stop_id"),
+            "stop_name": planned_window.get("stop_name"),
+            "line_id": planned_window.get("line_id"),
+            "route_id": planned_window.get("route_id"),
             "window_start": planned_window.get("window_start"),
             "window_end": planned_window.get("window_end"),
             "fetched_at": planned_window.get("fetched_at"),
