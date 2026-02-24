@@ -41,6 +41,14 @@ class TisseoApiUsageTracker:
         self._endpoint_counts: dict[str, int] = {}
         self._daily_counts: dict[str, int] = {}
 
+        self._gtfs_total_calls = 0
+        self._gtfs_successful_calls = 0
+        self._gtfs_failed_calls = 0
+        self._gtfs_last_call_at: str | None = None
+        self._gtfs_last_success_at: str | None = None
+        self._gtfs_endpoint_counts: dict[str, int] = {}
+        self._gtfs_daily_counts: dict[str, int] = {}
+
     async def async_load(self) -> None:
         """Load persisted usage state."""
         data = await self._store.async_load()
@@ -62,6 +70,21 @@ class TisseoApiUsageTracker:
             for key, value in data.get("daily_counts", {}).items()
             if isinstance(key, str)
         }
+        self._gtfs_total_calls = int(data.get("gtfs_total_calls", 0))
+        self._gtfs_successful_calls = int(data.get("gtfs_successful_calls", 0))
+        self._gtfs_failed_calls = int(data.get("gtfs_failed_calls", 0))
+        self._gtfs_last_call_at = data.get("gtfs_last_call_at")
+        self._gtfs_last_success_at = data.get("gtfs_last_success_at")
+        self._gtfs_endpoint_counts = {
+            str(key): int(value)
+            for key, value in data.get("gtfs_endpoint_counts", {}).items()
+            if isinstance(key, str)
+        }
+        self._gtfs_daily_counts = {
+            str(key): int(value)
+            for key, value in data.get("gtfs_daily_counts", {}).items()
+            if isinstance(key, str)
+        }
         self._prune_daily_counts()
 
     async def async_shutdown(self) -> None:
@@ -77,21 +100,40 @@ class TisseoApiUsageTracker:
         return self._total_calls
 
     @callback
-    def record_call(self, endpoint: str, success: bool, status: int | None = None) -> None:
+    def record_call(
+        self,
+        endpoint: str,
+        success: bool,
+        status: int | None = None,
+        source: str = "api",
+    ) -> None:
         """Record one real API call."""
+        del status  # currently not persisted, kept for callback compatibility
         now = datetime.now(TOULOUSE_TZ)
         day_key = now.date().isoformat()
 
-        self._total_calls += 1
-        if success:
-            self._successful_calls += 1
-            self._last_success_at = now.isoformat()
-        else:
-            self._failed_calls += 1
+        if source == "gtfs":
+            self._gtfs_total_calls += 1
+            if success:
+                self._gtfs_successful_calls += 1
+                self._gtfs_last_success_at = now.isoformat()
+            else:
+                self._gtfs_failed_calls += 1
 
-        self._last_call_at = now.isoformat()
-        self._daily_counts[day_key] = self._daily_counts.get(day_key, 0) + 1
-        self._endpoint_counts[endpoint] = self._endpoint_counts.get(endpoint, 0) + 1
+            self._gtfs_last_call_at = now.isoformat()
+            self._gtfs_daily_counts[day_key] = self._gtfs_daily_counts.get(day_key, 0) + 1
+            self._gtfs_endpoint_counts[endpoint] = self._gtfs_endpoint_counts.get(endpoint, 0) + 1
+        else:
+            self._total_calls += 1
+            if success:
+                self._successful_calls += 1
+                self._last_success_at = now.isoformat()
+            else:
+                self._failed_calls += 1
+
+            self._last_call_at = now.isoformat()
+            self._daily_counts[day_key] = self._daily_counts.get(day_key, 0) + 1
+            self._endpoint_counts[endpoint] = self._endpoint_counts.get(endpoint, 0) + 1
 
         self._prune_daily_counts()
         self._schedule_save()
@@ -112,10 +154,15 @@ class TisseoApiUsageTracker:
         """Return current usage metrics."""
         today_key = datetime.now(TOULOUSE_TZ).date().isoformat()
         recent_days = dict(sorted(self._daily_counts.items(), reverse=True)[:30])
+        gtfs_recent_days = dict(sorted(self._gtfs_daily_counts.items(), reverse=True)[:30])
         top_endpoints = dict(
             sorted(self._endpoint_counts.items(), key=lambda item: item[1], reverse=True)[:20]
         )
+        gtfs_top_endpoints = dict(
+            sorted(self._gtfs_endpoint_counts.items(), key=lambda item: item[1], reverse=True)[:20]
+        )
         return {
+            # Realtime API metrics (legacy keys kept stable).
             "total_calls": self._total_calls,
             "successful_calls": self._successful_calls,
             "failed_calls": self._failed_calls,
@@ -124,6 +171,15 @@ class TisseoApiUsageTracker:
             "last_success_at": self._last_success_at,
             "daily_counts": recent_days,
             "endpoint_counts": top_endpoints,
+            # GTFS download/metadata metrics.
+            "gtfs_total_calls": self._gtfs_total_calls,
+            "gtfs_successful_calls": self._gtfs_successful_calls,
+            "gtfs_failed_calls": self._gtfs_failed_calls,
+            "gtfs_today_calls": self._gtfs_daily_counts.get(today_key, 0),
+            "gtfs_last_call_at": self._gtfs_last_call_at,
+            "gtfs_last_success_at": self._gtfs_last_success_at,
+            "gtfs_daily_counts": gtfs_recent_days,
+            "gtfs_endpoint_counts": gtfs_top_endpoints,
         }
 
     @callback
@@ -154,6 +210,13 @@ class TisseoApiUsageTracker:
                 "last_success_at": self._last_success_at,
                 "endpoint_counts": self._endpoint_counts,
                 "daily_counts": self._daily_counts,
+                "gtfs_total_calls": self._gtfs_total_calls,
+                "gtfs_successful_calls": self._gtfs_successful_calls,
+                "gtfs_failed_calls": self._gtfs_failed_calls,
+                "gtfs_last_call_at": self._gtfs_last_call_at,
+                "gtfs_last_success_at": self._gtfs_last_success_at,
+                "gtfs_endpoint_counts": self._gtfs_endpoint_counts,
+                "gtfs_daily_counts": self._gtfs_daily_counts,
             }
         )
 
@@ -166,12 +229,22 @@ class TisseoApiUsageTracker:
     def _prune_daily_counts(self) -> None:
         """Keep only recent daily counts."""
         cutoff = (datetime.now(TOULOUSE_TZ) - timedelta(days=API_USAGE_DAILY_RETENTION_DAYS)).date()
-        pruned: dict[str, int] = {}
+        pruned_api: dict[str, int] = {}
         for day, count in self._daily_counts.items():
             try:
                 parsed_day = datetime.fromisoformat(day).date()
             except ValueError:
                 continue
             if parsed_day >= cutoff:
-                pruned[day] = count
-        self._daily_counts = pruned
+                pruned_api[day] = count
+        self._daily_counts = pruned_api
+
+        pruned_gtfs: dict[str, int] = {}
+        for day, count in self._gtfs_daily_counts.items():
+            try:
+                parsed_day = datetime.fromisoformat(day).date()
+            except ValueError:
+                continue
+            if parsed_day >= cutoff:
+                pruned_gtfs[day] = count
+        self._gtfs_daily_counts = pruned_gtfs

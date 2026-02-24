@@ -86,10 +86,14 @@ Chaque arrêt configuré crée un device avec les entités suivantes :
 | **Line** | Chaîne | Nom court de la prochaine ligne (ex. « A », « L6 »). Attributs : line_name, line_color, transport_mode. |
 | **Destination** | Chaîne | Destination du prochain départ. |
 | **Planned departures** | Compteur (int) | Nombre de départs dans la dernière fenêtre future demandée pour cet arrêt. Attributs : `window_start`, `window_end`, `summary`, et liste complète `departures` pour notifications/tableaux de bord. |
-| **API calls total** | Compteur (int) | Compteur global des requêtes API réelles sur toutes les entrées Tisseo, regroupé sous l'appareil **Tisseo API Usage**. Attributs : last_call, last_success, daily_calls_30d, endpoint_calls_top. |
-| **API calls successful** | Compteur (int) | Nombre d'appels API réels réussis. |
-| **API calls failed** | Compteur (int) | Nombre d'appels API réels en échec (HTTP/auth/connexion/timeout). |
-| **API calls today** | Compteur (int) | Nombre d'appels API réels effectués aujourd'hui (fuseau Toulouse). |
+| **API calls total** | Compteur (int) | Compteur global des requêtes API temps réel (`api.tisseo.fr`) sur toutes les entrées Tisseo, regroupé sous l'appareil **Tisseo API Usage**. Attributs : last_call, last_success, daily_calls_30d, endpoint_calls_top, et compteurs GTFS. |
+| **API calls successful** | Compteur (int) | Nombre d'appels API temps réel réussis. |
+| **API calls failed** | Compteur (int) | Nombre d'appels API temps réel en échec (HTTP/auth/connexion/timeout). |
+| **API calls today** | Compteur (int) | Nombre d'appels API temps réel effectués aujourd'hui (fuseau Toulouse). |
+| **GTFS calls total** | Compteur (int) | Compteur des requêtes GTFS (métadonnées du dataset + téléchargement ZIP GTFS). Attributs : détail des endpoints GTFS et historique journalier GTFS. |
+| **GTFS calls successful** | Compteur (int) | Nombre de requêtes GTFS réussies. |
+| **GTFS calls failed** | Compteur (int) | Nombre de requêtes GTFS en échec. |
+| **GTFS calls today** | Compteur (int) | Nombre de requêtes GTFS effectuées aujourd'hui (fuseau Toulouse). |
 
 ### Capteurs binaires
 

@@ -56,6 +56,10 @@ async def async_setup_entry(
                 TisseoApiCallsSuccessfulSensor(hub.usage_tracker),
                 TisseoApiCallsFailedSensor(hub.usage_tracker),
                 TisseoApiCallsTodaySensor(hub.usage_tracker),
+                TisseoGtfsCallsTotalSensor(hub.usage_tracker),
+                TisseoGtfsCallsSuccessfulSensor(hub.usage_tracker),
+                TisseoGtfsCallsFailedSensor(hub.usage_tracker),
+                TisseoGtfsCallsTodaySensor(hub.usage_tracker),
             ]
         )
         _LOGGER.debug("Added API usage sensors for hub entry: %s", entry.title)
@@ -103,6 +107,10 @@ async def async_setup_entry(
                     TisseoApiCallsSuccessfulSensor(hub.usage_tracker),
                     TisseoApiCallsFailedSensor(hub.usage_tracker),
                     TisseoApiCallsTodaySensor(hub.usage_tracker),
+                    TisseoGtfsCallsTotalSensor(hub.usage_tracker),
+                    TisseoGtfsCallsSuccessfulSensor(hub.usage_tracker),
+                    TisseoGtfsCallsFailedSensor(hub.usage_tracker),
+                    TisseoGtfsCallsTodaySensor(hub.usage_tracker),
                 ]
             )
 
@@ -170,6 +178,8 @@ class TisseoApiCallsTotalSensor(TisseoApiUsageBaseSensor):
             "last_success": metrics["last_success_at"],
             "daily_calls_30d": metrics["daily_counts"],
             "endpoint_calls_top": metrics["endpoint_counts"],
+            "gtfs_total_calls": metrics["gtfs_total_calls"],
+            "gtfs_today_calls": metrics["gtfs_today_calls"],
         }
 
 
@@ -216,6 +226,80 @@ class TisseoApiCallsTodaySensor(TisseoApiUsageBaseSensor):
     def native_value(self) -> int:
         """Return API calls for today."""
         return int(self._usage_tracker.as_dict()["today_calls"])
+
+
+class TisseoGtfsCallsTotalSensor(TisseoApiUsageBaseSensor):
+    """Total GTFS requests (metadata + archive download)."""
+
+    _attr_unique_id = "tisseo_gtfs_calls_total"
+    _attr_name = "GTFS calls total"
+    _attr_native_unit_of_measurement = "calls"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:database-arrow-down"
+
+    @property
+    def native_value(self) -> int:
+        """Return total GTFS calls."""
+        return int(self._usage_tracker.as_dict()["gtfs_total_calls"])
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return detailed GTFS usage breakdown."""
+        metrics = self._usage_tracker.as_dict()
+        return {
+            "successful_calls": metrics["gtfs_successful_calls"],
+            "failed_calls": metrics["gtfs_failed_calls"],
+            "today_calls": metrics["gtfs_today_calls"],
+            "last_call": metrics["gtfs_last_call_at"],
+            "last_success": metrics["gtfs_last_success_at"],
+            "daily_calls_30d": metrics["gtfs_daily_counts"],
+            "endpoint_calls_top": metrics["gtfs_endpoint_counts"],
+        }
+
+
+class TisseoGtfsCallsSuccessfulSensor(TisseoApiUsageBaseSensor):
+    """Successful GTFS requests."""
+
+    _attr_unique_id = "tisseo_gtfs_calls_successful"
+    _attr_name = "GTFS calls successful"
+    _attr_native_unit_of_measurement = "calls"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:check-circle-outline"
+
+    @property
+    def native_value(self) -> int:
+        """Return successful GTFS calls."""
+        return int(self._usage_tracker.as_dict()["gtfs_successful_calls"])
+
+
+class TisseoGtfsCallsFailedSensor(TisseoApiUsageBaseSensor):
+    """Failed GTFS requests."""
+
+    _attr_unique_id = "tisseo_gtfs_calls_failed"
+    _attr_name = "GTFS calls failed"
+    _attr_native_unit_of_measurement = "calls"
+    _attr_state_class = SensorStateClass.TOTAL_INCREASING
+    _attr_icon = "mdi:close-circle-outline"
+
+    @property
+    def native_value(self) -> int:
+        """Return failed GTFS calls."""
+        return int(self._usage_tracker.as_dict()["gtfs_failed_calls"])
+
+
+class TisseoGtfsCallsTodaySensor(TisseoApiUsageBaseSensor):
+    """GTFS requests made today."""
+
+    _attr_unique_id = "tisseo_gtfs_calls_today"
+    _attr_name = "GTFS calls today"
+    _attr_native_unit_of_measurement = "calls"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_icon = "mdi:calendar-today"
+
+    @property
+    def native_value(self) -> int:
+        """Return GTFS calls for today."""
+        return int(self._usage_tracker.as_dict()["gtfs_today_calls"])
 
 
 class TisseoBaseSensor(CoordinatorEntity[TisseoStopCoordinator], SensorEntity):

@@ -226,7 +226,7 @@ class TisseoApiClient:
         self._session = session
         self._timeout = ClientTimeout(total=API_TIMEOUT)
         self._debug = debug
-        self._usage_callback: Callable[[str, bool, int | None], None] | None = None
+        self._usage_callback: Callable[[str, bool, int | None, str], None] | None = None
         self._gtfs_cache: _GtfsHierarchyCache | None = None
         self._gtfs_export_url: str = GTFS_DEFAULT_EXPORT_URL
         self._gtfs_last_failure_at: datetime | None = None
@@ -264,19 +264,29 @@ class TisseoApiClient:
             _LOGGER.debug("[TISSEO] " + msg, *args)
 
     def set_usage_callback(
-        self, callback: Callable[[str, bool, int | None], None] | None
+        self, callback: Callable[[str, bool, int | None, str], None] | None
     ) -> None:
         """Set callback invoked for each real API request."""
         self._usage_callback = callback
 
-    def _record_usage(self, endpoint: str, success: bool, status: int | None) -> None:
-        """Record one real API request via callback."""
+    def _record_usage(
+        self,
+        endpoint: str,
+        success: bool,
+        status: int | None,
+        source: str = "api",
+    ) -> None:
+        """Record one real request via callback."""
         if self._usage_callback is None:
             return
         try:
-            self._usage_callback(endpoint, success, status)
+            self._usage_callback(endpoint, success, status, source)
         except Exception:  # pragma: no cover - defensive safety
-            _LOGGER.exception("Failed to record API usage for endpoint %s", endpoint)
+            _LOGGER.exception(
+                "Failed to record %s usage for endpoint %s",
+                source,
+                endpoint,
+            )
 
     async def _api_request(
         self,
@@ -396,12 +406,33 @@ class TisseoApiClient:
     async def _resolve_gtfs_export_url(self) -> str:
         """Resolve the current GTFS export URL from dataset metadata."""
         session = await self._get_session()
-        async with session.get(GTFS_DATASET_METADATA_URL) as response:
-            if response.status != 200:
-                raise TisseoApiError(
-                    f"GTFS metadata request failed with status {response.status}"
+        try:
+            async with session.get(GTFS_DATASET_METADATA_URL) as response:
+                if response.status != 200:
+                    self._record_usage(
+                        "gtfs_dataset_metadata",
+                        success=False,
+                        status=response.status,
+                        source="gtfs",
+                    )
+                    raise TisseoApiError(
+                        f"GTFS metadata request failed with status {response.status}"
+                    )
+                payload = await response.json()
+                self._record_usage(
+                    "gtfs_dataset_metadata",
+                    success=True,
+                    status=response.status,
+                    source="gtfs",
                 )
-            payload = await response.json()
+        except (aiohttp.ClientError, TimeoutError) as err:
+            self._record_usage(
+                "gtfs_dataset_metadata",
+                success=False,
+                status=None,
+                source="gtfs",
+            )
+            raise TisseoConnectionError(f"Connection error: {err}") from err
 
         exports = payload.get("alternative_exports", [])
         if isinstance(exports, dict):
@@ -447,19 +478,48 @@ class TisseoApiClient:
                 err,
             )
 
-        async with session.get(
-            export_url,
-            allow_redirects=True,
-            timeout=ClientTimeout(total=GTFS_DOWNLOAD_TIMEOUT_SECONDS),
-        ) as response:
-            if response.status != 200:
-                raise TisseoApiError(
-                    f"GTFS download request failed with status {response.status}"
-                )
-            content = await response.read()
+        try:
+            async with session.get(
+                export_url,
+                allow_redirects=True,
+                timeout=ClientTimeout(total=GTFS_DOWNLOAD_TIMEOUT_SECONDS),
+            ) as response:
+                if response.status != 200:
+                    self._record_usage(
+                        "gtfs_download",
+                        success=False,
+                        status=response.status,
+                        source="gtfs",
+                    )
+                    raise TisseoApiError(
+                        f"GTFS download request failed with status {response.status}"
+                    )
+                content = await response.read()
+                response_status = response.status
+        except (aiohttp.ClientError, TimeoutError) as err:
+            self._record_usage(
+                "gtfs_download",
+                success=False,
+                status=None,
+                source="gtfs",
+            )
+            raise TisseoConnectionError(f"Connection error: {err}") from err
 
         if not content:
+            self._record_usage(
+                "gtfs_download",
+                success=False,
+                status=None,
+                source="gtfs",
+            )
             raise TisseoApiError("GTFS download returned an empty body")
+
+        self._record_usage(
+            "gtfs_download",
+            success=True,
+            status=response_status,
+            source="gtfs",
+        )
 
         return content
 

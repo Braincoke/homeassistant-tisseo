@@ -72,3 +72,12 @@ If GTFS download/parse fails:
 2. Otherwise fall back to current API endpoints (`rolling_stocks`, `lines`, `stop_points`).
 
 This keeps setup resilient while still minimizing API usage when GTFS is healthy.
+
+## Usage observability
+
+The **Tisseo API Usage** device now exposes separate counters:
+
+- Realtime API counters: `API calls *`
+- GTFS counters: `GTFS calls *`
+
+This allows you to distinguish `api.tisseo.fr` usage from GTFS Open Data fetches.

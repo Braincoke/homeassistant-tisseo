@@ -77,10 +77,14 @@ Each configured stop creates a device with the following entities:
 | **Line** | String | Short name of the next line (e.g., "A", "L6"). Attributes include line_name, line_color, transport_mode. |
 | **Destination** | String | Destination name of the next departure. |
 | **Planned departures** | Count (int) | Number of departures in the last requested future window for that stop. Attributes include `window_start`, `window_end`, `summary`, and full `departures` list for notifications/dashboards. |
-| **API calls total** | Count (int) | Global counter of real API requests across all Tisseo entries, grouped under the dedicated **Tisseo API Usage** device. Attributes include last_call, last_success, daily_calls_30d, and endpoint_calls_top. |
-| **API calls successful** | Count (int) | Number of successful real API calls. |
-| **API calls failed** | Count (int) | Number of failed real API calls (HTTP errors, auth errors, connection errors, timeouts). |
-| **API calls today** | Count (int) | Number of real API calls made today (Toulouse timezone). |
+| **API calls total** | Count (int) | Global counter of realtime API requests (`api.tisseo.fr`) across all Tisseo entries, grouped under the dedicated **Tisseo API Usage** device. Attributes include last_call, last_success, daily_calls_30d, endpoint_calls_top, and GTFS totals. |
+| **API calls successful** | Count (int) | Number of successful realtime API calls. |
+| **API calls failed** | Count (int) | Number of failed realtime API calls (HTTP errors, auth errors, connection errors, timeouts). |
+| **API calls today** | Count (int) | Number of realtime API calls made today (Toulouse timezone). |
+| **GTFS calls total** | Count (int) | Counter for GTFS network requests (dataset metadata + GTFS ZIP download). Attributes include GTFS endpoint breakdown and GTFS daily history. |
+| **GTFS calls successful** | Count (int) | Number of successful GTFS requests. |
+| **GTFS calls failed** | Count (int) | Number of failed GTFS requests. |
+| **GTFS calls today** | Count (int) | Number of GTFS requests made today (Toulouse timezone). |
 
 ### Binary Sensors
 
